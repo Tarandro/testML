@@ -36,7 +36,36 @@ class Flags:
     # name of target column
     target: str = 'target'
 
-    ### Preprocessing
+    ### Preprocessing ML
+    # type_columns
+    type_columns: dict = field(default_factory=lambda: None)
+    apply_preprocessing_mandatory: bool = True
+    remove_categorical: bool = False
+
+    method_nan_categorical: str = 'constant'
+    method_nan_numeric: str = 'mean'
+    subsample: float = 1
+    feature_interaction: bool = False
+    feature_ratio: bool = False
+    polynomial_features: bool = False
+    remove_multicollinearity: bool = False
+    multicollinearity_threshold: float = 0.9
+    feature_selection: bool = False
+    feature_selection_threshold: float = 0.8
+    bin_numeric_features: list = field(default_factory=list)
+    remove_low_variance: bool = False
+    remove_percentage: float = 0.8
+    info_pca: dict = field(default_factory=dict)
+    info_tsne: dict = field(default_factory=dict)
+    info_stats: dict = field(default_factory=dict)
+
+    ### Preprocessing Time-Series
+    position_id: str = field(default_factory=lambda: None)  ## can be a dataframe
+    step_lags: list = field(default_factory=list)
+    step_rolling: list = field(default_factory=list)
+    win_type: str = field(default_factory=lambda: None)
+
+    ### Preprocessing NLP
     # can apply a small cleaning on text column:
     apply_small_clean: bool = True
     # name of spacy model for preprocessing (fr:"fr_core_news_md", en:"en_core_web_md")

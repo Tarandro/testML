@@ -15,7 +15,7 @@ from .flags import save_yaml, load_yaml
 import dataclasses
 from joblib import load
 
-from .features.cleaner import Preprocessing_NLP
+from .features.cleaner import Preprocessing
 
 from .features.embeddings.tf_embedding import Tf_embedding
 from .features.embeddings.tfidf import Tfidf
@@ -260,11 +260,14 @@ class AutoNLP:
 
         # Preprocessing
         logger.info("\nBegin preprocessing of {} data :".format(len(data)))
-        self.pre = Preprocessing_NLP(data, self.flags_parameters)
-        self.data, self.doc_spacy_data = self.pre.transform(data)
+        self.pre = Preprocessing(data, self.flags_parameters)
+        self.data, self.doc_spacy_data = self.pre.fit_transform(data)
 
         # WARNING : self.column_text (int) is now the column number of self.column_text (str) in self.data
-        self.column_text = list(self.data.columns).index(self.pre.column_text)
+        if self.pre.column_text is not None:
+            self.column_text = list(self.data.columns).index(self.pre.column_text)
+        else:
+            self.column_text = None
 
         # del data
 
@@ -348,7 +351,7 @@ class AutoNLP:
                 y_test = None
             data_test, doc_spacy_data_test = self.pre.transform(data_test)
         else:
-            self.pre = Preprocessing_NLP(data_test, self.flags_parameters)
+            self.pre = Preprocessing(data_test, self.flags_parameters)
             data_test, doc_spacy_data_test = self.pre.transform(data_test)
             self.column_text = list(data_test.columns).index(self.pre.column_text)
             self.target = self.pre.target

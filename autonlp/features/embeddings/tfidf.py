@@ -15,7 +15,7 @@ from tensorflow.keras.layers import Embedding
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from ...features.cleaner import reduce_text_data
+from ...utils.nlp_preprocessing import reduce_text_data
 from ...utils.logging import get_logger
 
 logger = get_logger(__name__)
