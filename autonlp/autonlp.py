@@ -13,7 +13,8 @@ from shutil import rmtree, copytree, copyfile
 from matplotlib.ticker import FormatStrFormatter
 from .flags import save_yaml, load_yaml
 import dataclasses
-from joblib import load
+from joblib import load, dump
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 
 from .features.cleaner import Preprocessing
 
@@ -118,6 +119,8 @@ class AutoNLP:
         """
         self.flags_parameters = flags_parameters
         self.include_model = flags_parameters.include_model
+        self.ordinal_features = flags_parameters.ordinal_features
+        self.normalize = flags_parameters.normalize
         self.column_text = flags_parameters.column_text
         self.apply_mlflow = flags_parameters.apply_mlflow
         self.experiment_name = flags_parameters.experiment_name
@@ -140,6 +143,12 @@ class AutoNLP:
         self.apply_validation = flags_parameters.apply_validation
         self.apply_blend_model = flags_parameters.apply_blend_model
         self.method_embedding = {k.lower(): v for k, v in flags_parameters.method_embedding.items()}
+
+        self.position_id = flags_parameters.position_id
+        self.position_date = flags_parameters.position_date
+        self.size_train_prc = flags_parameters.size_train_prc
+        self.time_series_recursive = flags_parameters.time_series_recursive
+        self.LSTM_date_features = flags_parameters.LSTM_date_features
 
         self.outdir = self.flags_parameters.outdir
         flags_dict = dataclasses.asdict(self.flags_parameters)
@@ -214,7 +223,7 @@ class AutoNLP:
                 - build doc_spacy_data_train and doc_spacy_data_test """
         # DEBUG
         if self.debug:
-            logger.info("\n DEBUG MODE : only a small portion is use for training set")
+            logger.info("\n DEBUG MODE : only a small portion is used for training set")
             train_data = self.data.sample(n=min(50, len(self.data)), random_state=self.seed)
         else:
             train_data = self.data.sample(frac=self.frac_trainset, random_state=self.seed)
@@ -247,6 +256,121 @@ class AutoNLP:
             logger.info("Test set size : {}".format(len(self.X_test)))
         else:
             logger.info("Test set size : 0")
+
+    def split_data_ts(self, startDate_train, endDate_train):
+
+        # DEBUG
+        if self.debug:
+            logger.info("\n DEBUG MODE : only a small dataset portion is used")
+            self.data = self.data.sample(n=min(50, len(self.data)), random_state=self.seed)
+
+        if self.data.shape[1] == 0:  # can't do tabular prediction (case if only column text)
+            self.exclude_model = ['LightGBM', 'XGBoost', 'SimpleNeuralNetwork']
+            if startDate_train == 'all' and endDate_train == 'all':
+                self.Y_train = self.Y.copy()
+            elif startDate_train == 'all':
+                self.Y_train = self.Y.loc[:endDate_train, :].copy()
+            elif endDate_train == 'all':
+                self.Y_train = self.Y.loc[startDate_train:, :].copy()
+            else:
+                self.Y_train = self.Y.loc[startDate_train:endDate_train, :].copy()
+            if endDate_train != 'all' and endDate_train != self.Y.index[-1]:
+                self.Y_test = self.Y.loc[endDate_train:, :].copy()
+
+        else:
+            if startDate_train == 'all' and endDate_train == 'all':
+                self.X_train = self.data
+            elif startDate_train == 'all':
+                self.X_train = self.data[self.data[self.position_date] <= endDate_train]
+            elif endDate_train == 'all':
+                self.X_train = self.data[self.data[self.position_date] >= startDate_train]
+            else:
+                self.X_train = self.data[(self.data[self.position_date] >= startDate_train) & (
+                            self.data[self.position_date] <= endDate_train)]
+
+            if self.doc_spacy_data is not None:
+                self.doc_spacy_data_train = np.array(self.doc_spacy_data)[list(self.X_train.index)]
+            else:
+                self.doc_spacy_data_train = None
+
+            if endDate_train != 'all' and endDate_train != np.max(self.data[self.position_date]):
+                self.X_test = self.data[self.data[self.position_date] > endDate_train]
+                if self.doc_spacy_data is not None:
+                    self.doc_spacy_data_test = np.array(self.doc_spacy_data)[list(self.X_test.index)]
+                else:
+                    self.doc_spacy_data_test = None
+            else:
+                self.doc_spacy_data_test = None
+
+            #del self.data
+
+            self.Y_train = self.Y.loc[self.X_train.index, :]
+            try:
+                self.Y_test = self.Y.loc[self.X_test.index, :]
+            except:
+                pass
+
+    def fit_transform_normalize_data(self):
+        self.features = self.X_train.columns.values
+        if self.flags_parameters.method_scaling == 'MinMaxScaler':
+            self.scaler = MinMaxScaler(feature_range=(0, 1), copy=False)  # or (-1,1)
+        elif self.flags_parameters.method_scaling == 'RobustScaler':
+            self.scaler = RobustScaler(copy=False)
+        else:
+            self.scaler = StandardScaler(copy=False)
+
+        self.column_to_normalize = [col for col in self.features if
+                                    col not in self.ordinal_features + [self.pre.column_text]]  # from pre because int
+
+        if len(self.column_to_normalize) > 0:
+            self.scaler.fit(self.X_train[self.column_to_normalize])
+
+            dump(self.scaler, os.path.join(self.outdir, "scaler.pkl"))
+            self.scaler_info = [self.scaler, self.column_to_normalize].copy()
+
+            #for col in self.column_to_normalize:
+            #    self.scaler.fit(self.X_train[[col]])
+            #    a = self.X_train[[col]].values
+            #    self.X_train[[col]] = self.scaler.transform(a)
+            #    del a
+            #    try:
+            #        a = self.X_test[[col]].values
+            #        self.X_test[[col]] = self.scaler.transform(a)
+            #        del a
+            #    except:
+            #        pass
+
+            ### take a lot of memory to do it all together !
+            self.X_train[self.column_to_normalize] = self.scaler.transform(self.X_train[self.column_to_normalize].values)
+            try:
+                self.X_val[self.column_to_normalize] = self.scaler.transform(self.X_val[self.column_to_normalize].values)
+            except:
+                pass
+            try:
+                self.X_test[self.column_to_normalize] = self.scaler.transform(self.X_test[self.column_to_normalize].values)
+            except:
+                pass
+        else:
+            self.scaler_info = None
+
+    def transform_normalize_data(self, X):
+        self.features = X.columns.values
+
+        self.column_to_normalize = [col for col in self.features if
+                                    col not in self.ordinal_features + [self.pre.column_text]]  # from pre because int
+
+        if len(self.column_to_normalize) > 0:
+            try:
+                scaler = self.scaler
+            except:
+                scaler = load(os.path.join(self.outdir, "scaler.pkl"))
+            self.scaler_info = [scaler, self.column_to_normalize].copy()
+
+            ### take a lot of memory to do it all together !
+            X[self.column_to_normalize] = scaler.transform(X[self.column_to_normalize].values)
+        else:
+            self.scaler_info = None
+        return X
 
     def data_preprocessing(self, data=None):
         """ Apply :class:Preprocessing_NLP from preprocessing_nlp.py
@@ -283,46 +407,73 @@ class AutoNLP:
         self.target = self.pre.target
         self.Y = self.pre.Y
 
+        self.ordinal_features = [col for col in self.ordinal_features if col in self.data.columns]
+        self.LSTM_date_features = [col for col in self.LSTM_date_features if col in self.data.columns]
+        self.len_unique_value = {}
+        for col in list(set(self.ordinal_features + self.LSTM_date_features)):
+            self.len_unique_value[col] = len(self.data[col].unique())
+
         # Cross-validation :
         if self.flags_parameters.path_data_validation == '' or self.flags_parameters.path_data_validation is None:
-            # split self.data
-            self.split_data()
             self.Y_val = None
             self.X_val = None
             self.doc_spacy_data_val = None
+
+            # split self.data
+            if 'time_series' in self.objective:
+                self.split_data_ts(self.flags_parameters.startDate_train, self.flags_parameters.endDate_train)
+                self.time_series_features = (
+                self.pre.step_lags, self.pre.step_rolling, self.pre.win_type, self.position_id, self.position_date)
+            else:
+                self.split_data()
+                self.time_series_features = None
+
         # Validation
         # use a loaded validation dataset :
         else:
             # all rows from data will be training rows
-            self.frac_trainset = 1
-            self.split_data()
+            if 'time_series' in self.objective:
+                self.split_data_ts("all", "all")
+                self.time_series_features = (
+                    self.pre.step_lags, self.pre.step_rolling, self.pre.win_type, self.position_id, self.position_date)
+            else:
+                self.frac_trainset = 1
+                self.split_data()
             dataset_val = pd.read_csv(self.flags_parameters.path_data_validation)
 
             if len([col for col in self.target if col in dataset_val.columns]) > 0:
                 self.Y_val = dataset_val[[col for col in self.target if col in dataset_val.columns]]
+                for col in self.target:
+                    if col in dataset_val.columns:
+                        dataset_val = dataset_val.drop([col], axis=1)
             else:
                 self.Y_val = None
 
-            dataset_val, self.doc_spacy_data_val = self.preprocess_test_data(dataset_val)
+            self.X_val, self.doc_spacy_data_val = self.preprocess_test_data(dataset_val)
 
             if self.Y_val is not None:
                 assert self.Y_val.shape[1] > 0, 'target specifying the column with labels to predict is not in data_val'
 
             # use label map if labels are not numerics
-            if self.flags_parameters.map_label != {}:
+            if self.Y_val.shape[1] == 1 and self.flags_parameters.map_label != {}:
                 if self.Y_val[self.Y_val.columns[0]].iloc[0] in self.flags_parameters.map_label.keys():
                     self.Y_val[self.Y_val.columns[0]] = self.Y_val[self.Y_val.columns[0]].map(
                         self.flags_parameters.map_label)
                     if self.Y_val[self.Y_val.columns[0]].isnull().sum() > 0:
                         logger.error("Unknown label name during map of test labels")
-
-            # keep only the column with texts
-            self.X_val = dataset_val[[self.flags_parameters.column_text]]
-            del dataset_val
+            elif self.Y_val.shape[1] > 1 and self.flags_parameters.map_label != {}:
+                for i in range(self.Y_val.shape[1]):
+                    if i in self.flags_parameters.map_label.keys() and self.Y_val[self.Y_val.columns[i]].iloc[0] in self.flags_parameters.map_label.keys():
+                        self.Y_val[self.Y_val.columns[i]] = self.Y_val[self.Y_val.columns[i]].map(self.flags_parameters.map_label)
 
             self.X_test = self.X_val.copy()
             self.Y_test = self.Y_val.copy()
             self.doc_spacy_data_test = self.doc_spacy_data_val
+
+        if self.normalize:
+            self.fit_transform_normalize_data()
+        else:
+            self.scaler_info = None
 
     def preprocess_test_data(self, data_test):
         """ Apply same transformation as in the function self.data_preprocessing for data_test
@@ -343,19 +494,31 @@ class AutoNLP:
             if len([col for col in self.target if col in data_test.columns]) > 0:
                 y_test = data_test[[col for col in self.target if col in data_test.columns]]
 
-                if self.flags_parameters.map_label != {}:
+                if y_test.shape[1] == 1 and self.flags_parameters.map_label != {}:
                     if y_test[y_test.columns[0]].iloc[0] in self.flags_parameters.map_label.keys():
                         y_test[y_test.columns[0]] = y_test[y_test.columns[0]].map(self.flags_parameters.map_label)
-
+                elif y_test.shape[1] > 1 and self.flags_parameters.map_label != {}:
+                    for i in range(y_test.shape[1]):
+                        if i in self.flags_parameters.map_label.keys() and y_test[y_test.columns[i]].iloc[0] in self.flags_parameters.map_label.keys():
+                            y_test[y_test.columns[i]] = y_test[y_test.columns[i]].map(self.flags_parameters.map_label)
             else:
                 y_test = None
             data_test, doc_spacy_data_test = self.pre.transform(data_test)
         else:
             self.pre = Preprocessing(data_test, self.flags_parameters)
             data_test, doc_spacy_data_test = self.pre.transform(data_test)
-            self.column_text = list(data_test.columns).index(self.pre.column_text)
+            if self.pre.column_text is not None:
+                self.column_text = list(data_test.columns).index(self.pre.column_text)
+            else:
+                self.column_text = None
             self.target = self.pre.target
             y_test = self.pre.Y
+
+        if self.normalize:
+            data_test = self.transform_normalize_data(data_test)
+        else:
+            self.scaler_info = None
+
         if y_test is None:
             return data_test, doc_spacy_data_test
         else:

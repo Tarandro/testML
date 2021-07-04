@@ -8,18 +8,61 @@ from autonlp.flags import Flags
 
 flags_dict_info = {
     "debug": False,  # for debug : use only 50 data rows for training
-    "path_data": "C:/Users/agassmann/Documents/data/FinancialPhraseBank.csv",
+    "path_data": "C:/Users/agassmann/Documents/data/churn_modelling.csv",
     "path_data_validation": "",
     "apply_logs": True,
     "outdir": "./logs",
     "apply_mlflow": False,
     "experiment_name": "AutoNLP_3",
     "seed": 15,
-    "apply_app": False
+    "apply_app": False,
+
+    "target": "Exited"
 }
-flags_dict_preprocessing = {
-    "column_text": "text_fr",  # name column with texts
-    "target": "sentiment",
+flags_dict_ml_preprocessing = {
+
+    "ordinal_features": [],
+    "normalize": True,
+    "method_scaling": 'MinMaxScaler',   # 'MinMaxScaler', 'RobustScaler', 'StandardScaler'
+    "type_columns": None,
+    "apply_preprocessing_mandatory": True,
+    "remove_categorical": False,
+
+    "method_nan_categorical": 'constant',
+    "method_nan_numeric": 'mean',
+    "subsample": 0.3,
+    "feature_interaction": True,
+    "feature_ratio": True,
+    "polynomial_features": True,
+    "remove_multicollinearity": True,
+    "multicollinearity_threshold": 0.9,
+    "feature_selection": True,
+    "feature_selection_threshold": 0.8,
+    "bin_numeric_features": [],
+    "remove_low_variance": True,
+    "remove_percentage": 0.8,
+    "info_pca": {},
+    "info_tsne": {},
+    "info_stats": {'BalanceSalaryRatio':('div',['Balance','EstimatedSalary']),
+              'TenureByAge':('div',['Tenure','Age']),
+              'CreditScoreGivenAge':('div',['CreditScore','Age'])}
+}
+
+flags_dict_ts_preprocessing = {
+    "startDate_train": 'all',  # or int  need to be a continuous numeric column
+    "endDate_train": 'all',    # or int
+    "position_id": None,   # can be a dataframe
+    "position_date": None,   # need to be a continuous numeric column
+    "size_train_prc": 0.8,
+    "time_series_recursive": False,
+    "LSTM_date_features": [],
+    "step_lags": [],
+    "step_rolling": [],
+    "win_type": None
+}
+
+flags_dict_nlp_preprocessing = {
+    "column_text": None,  # name column with texts
     "language_text": "fr",
     "apply_small_clean": True,
     "name_spacy_model": "fr_core_news_md",  # en_core_web_md
@@ -28,7 +71,7 @@ flags_dict_preprocessing = {
 }
 
 flags_dict_autonlp = {
-    "objective": 'multi-class',    # 'binary' or 'multi-class' or 'regression'
+    "objective": 'binary',    # 'binary' or 'multi-class' or 'regression'
     "include_model": ['tf-idf+Logistic_Regression'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
     "max_run_time_per_model": 10,
     "frac_trainset": 0.7,
@@ -55,7 +98,8 @@ flags_dict_display = {
 }
 
 flags = Flags().update(flags_dict_info)
-flags = flags.update(flags_dict_preprocessing)
+flags = flags.update(flags_dict_ml_preprocessing)
+flags = flags.update(flags_dict_nlp_preprocessing)
 flags = flags.update(flags_dict_autonlp)
 flags = flags.update(flags_dict_display)
 print("flags :", flags)
@@ -65,7 +109,7 @@ debug = flags.debug
 
 if __name__ == '__main__':
     #####################
-    # AutoNLP
+    # AutoML
     #####################
 
     autonlp = AutoNLP(flags)
@@ -75,7 +119,12 @@ if __name__ == '__main__':
     #####################
 
     autonlp.data_preprocessing()
+    import pandas as pd
+    data = pd.read_csv(flags.path_data)
+    c = data[100:150].reset_index(drop=True)
+    data_test, doc_spacy_data_test, y_test = autonlp.preprocess_test_data(c)
 
+if False:
     autonlp.data.to_csv('./results/data_preprocessed.csv', index=False)
     autonlp.X_train.to_csv('./results/X_train.csv', index=False)
     autonlp.X_test.to_csv('./results/X_test.csv', index=False)

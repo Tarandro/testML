@@ -83,7 +83,6 @@ class Preprocessing:
         self.map_label = dict()
 
         assert isinstance(data, pd.DataFrame), "data must be a DataFrame type"
-        assert self.column_text in data.columns, 'column_text specifying the column with text is not in data'
 
         # self.target need to be a List
         self.target = flags_parameters.target
@@ -129,8 +128,9 @@ class Preprocessing:
                 'date': list(data.loc[:,
                              data.dtypes.astype(str).isin(['datetime64', 'datetime64[ns]', 'datetime'])].columns)
             }
+            self.type_columns = {k: [col for col in v if col not in self.target] for k, v in self.type_columns.items()}
 
-        self.base_features = list(data.columns)  # useful for pca / tsne in case of categorical features
+        self.base_features = [col for col in list(data.columns) if col not in self.target]  # useful for pca / tsne in case of categorical features
 
     def load_spacy_model(self, name_spacy_model="fr_core_news_md"):
         """ Download Spacy pre-train model
@@ -269,7 +269,7 @@ class Preprocessing:
                 concat_data = pd.concat([dummies, concat_data.drop([col_categorical], axis=1)], axis=1)
                 concat_data = concat_data[order_columns]
 
-            data_test = concat_data[len(self.start_data):]
+            data_test = concat_data[len(self.start_data):].reset_index(drop=True)  # !!!
         return data_test
 
     def build_feature_bin_numeric(self, data):
@@ -318,14 +318,14 @@ class Preprocessing:
                 dict_new_features[col].append(col + '_power2')
                 self.col_power_2[col + '_power2'] = col
 
-        self.col_multi_polynomial = {}
-        for i in range(len(columns_num)):
-            for j in range(i + 1, len(columns_num)):
-                data[columns_num[i] + '_multi_' + columns_num[j]] = data[columns_num[i]] * data[columns_num[j]]
-                dict_new_features[columns_num[i]].append(columns_num[i] + '_multi_' + columns_num[j])
-                dict_new_features[columns_num[j]].append(columns_num[i] + '_multi_' + columns_num[j])
-                self.col_multi_polynomial[columns_num[i] + '_multi_' + columns_num[j]] = (
-                columns_num[i], columns_num[j])
+        #self.col_multi_polynomial = {}
+        #for i in range(len(columns_num)):
+        #    for j in range(i + 1, len(columns_num)):
+        #        data[columns_num[i] + '_multi_' + columns_num[j]] = data[columns_num[i]] * data[columns_num[j]]
+        #        dict_new_features[columns_num[i]].append(columns_num[i] + '_multi_' + columns_num[j])
+        #        dict_new_features[columns_num[j]].append(columns_num[i] + '_multi_' + columns_num[j])
+        #        self.col_multi_polynomial[columns_num[i] + '_multi_' + columns_num[j]] = (
+        #        columns_num[i], columns_num[j])
 
         features_importance = get_features_importance(data, self.Y, self.subsample, self.class_weight)
 
@@ -338,16 +338,16 @@ class Preprocessing:
                     data = data.drop([new_col], axis=1)
                     if new_col in self.col_power_2.keys():
                         del self.col_power_2[new_col]
-                    elif new_col in self.col_multi_polynomial.keys():
-                        del self.col_multi_polynomial[new_col]
+                    #elif new_col in self.col_multi_polynomial.keys():
+                    #    del self.col_multi_polynomial[new_col]
         return data
 
     def build_feature_polynomial_transform(self, data_test):
         for col in self.col_power_2.values():
             data_test[col + '_power2'] = data_test[col] ** 2
 
-        for cols in self.col_multi_polynomial.values():
-            data_test[cols[0] + '_multi_' + cols[1]] = data_test[cols[0]] * data_test[cols[1]]
+        #for cols in self.col_multi_polynomial.values():
+        #    data_test[cols[0] + '_multi_' + cols[1]] = data_test[cols[0]] * data_test[cols[1]]
         return data_test
 
     def build_feature_interaction(self, data):
@@ -534,7 +534,7 @@ class Preprocessing:
                 if 'multi' in method:
                     data_multi = data[features[0]]
                     for col in features[1:]:
-                        data_multi = data_multi * data[features[1]]
+                        data_multi = data_multi * data[col]
                     name_column = 'multi_' + '_'.join(features)
                     data[name_column[0:60]] = data_multi
                     self.info_stats_for_transform[name] = ('multi', features, name_column[0:60])
@@ -578,7 +578,7 @@ class Preprocessing:
             if 'multi' in method:
                 data_multi = data_test[features[0]]
                 for col in features[1:]:
-                    data_multi = data_multi * data_test[features[1]]
+                    data_multi = data_multi * data_test[col]
                 data_test[col_name] = data_multi
 
             if 'div' in method:
@@ -766,10 +766,10 @@ class Preprocessing:
             else:
                 logger.warning("you give a name for column_text : {}. But it is not in data columns.".format(self.column_text))
                 self.column_text = None
-                self.doc_spacy_data = None
+                doc_spacy_data = None
         else:
             self.column_text = None
-            self.doc_spacy_data = None
+            doc_spacy_data = None
 
         if self.apply_preprocessing_mandatory:
             data = self.preprocessing_mandatory(data)
@@ -810,24 +810,20 @@ class Preprocessing:
         return data, doc_spacy_data
 
     def transform(self, data_test):
-        has_target = False
+
         if self.target is not None:
-            Y_test = data_test[[col for col in self.target if col in data_test.columns]]
-            s = 0
             for col in self.target:
                 if col in data_test.columns:
-                    s += 1
                     data_test = data_test.drop([col], axis=1)
-            if s == len(self.target):
-                has_target = True
 
         if self.column_text is not None:
-            list_texts, self.doc_spacy_data_test = self.transform_nlp(data_test[self.column_text])
+            list_texts, doc_spacy_data_test = self.transform_nlp(data_test[self.column_text])
             data_test = data_test.drop([self.column_text], axis=1)
+        else:
+            doc_spacy_data_test = None
 
         if self.apply_preprocessing_mandatory:
             data_test = self.preprocessing_mandatory_transform(data_test)
-
         if len(self.bin_numeric_features) > 0:
             data_test = self.build_feature_bin_numeric_transform(data_test)
         if self.polynomial_features:
@@ -837,11 +833,11 @@ class Preprocessing:
         if self.feature_ratio:
             data_test = self.build_feature_ratio_transform(data_test)
         if len(self.info_tsne.keys()) > 0:
-            data_test = self.build_fe_tsne_transform()
+            data_test = self.build_fe_tsne_transform(data_test)
         if len(self.info_pca.keys()) > 0:
-            data_test = self.build_fe_pca_transform()
+            data_test = self.build_fe_pca_transform(data_test)
         if len(self.info_stats.keys()) > 0:
-            data_test = self.build_fe_stats_transform()
+            data_test = self.build_fe_stats_transform(data_test)
         if self.remove_low_variance:
             data_test = self.feature_selection_VarianceThreshold_transform(data_test)
         if self.remove_multicollinearity:
@@ -860,7 +856,4 @@ class Preprocessing:
             if col not in data_test.columns:
                 print(col, 'is not in test data')
 
-        if has_target:
-            data_test[self.target] = Y_test[self.target]
-
-        return data_test
+        return data_test, doc_spacy_data_test

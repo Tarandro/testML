@@ -37,7 +37,9 @@ class Flags:
     target: str = 'target'
 
     ### Preprocessing ML
-    # type_columns
+    ordinal_features: list = field(default_factory=list)
+    normalize: bool = True
+    method_scaling: str = 'MinMaxScaler'   # 'MinMaxScaler', 'RobustScaler', 'StandardScaler'
     type_columns: dict = field(default_factory=lambda: None)
     apply_preprocessing_mandatory: bool = True
     remove_categorical: bool = False
@@ -60,7 +62,13 @@ class Flags:
     info_stats: dict = field(default_factory=dict)
 
     ### Preprocessing Time-Series
-    position_id: str = field(default_factory=lambda: None)  ## can be a dataframe
+    startDate_train: str = 'all'  # or int  need to be a continuous numeric column
+    endDate_train: str = 'all'    # or int
+    position_id: str = field(default_factory=lambda: None)   # can be a dataframe
+    position_date: str = field(default_factory=lambda: None)   # need to be a continuous numeric column
+    size_train_prc: float = 0.8
+    time_series_recursive: bool = False
+    LSTM_date_features: list = field(default_factory=list)
     step_lags: list = field(default_factory=list)
     step_rolling: list = field(default_factory=list)
     win_type: str = field(default_factory=lambda: None)
