@@ -1,0 +1,6 @@
+/logs/
+/results/
+/logs_binary/
+/mlruns/
+/data/
+/model_deployment/
