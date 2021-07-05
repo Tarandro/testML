@@ -17,11 +17,11 @@ flags_dict_info = {
     "seed": 15,
     "apply_app": False,
 
-    "target": "Exited"
+    "target": ["Exited"]
 }
 flags_dict_ml_preprocessing = {
 
-    "ordinal_features": [],
+    "ordinal_features": ["Geography"],
     "normalize": True,
     "method_scaling": 'MinMaxScaler',   # 'MinMaxScaler', 'RobustScaler', 'StandardScaler'
     "type_columns": None,
@@ -38,10 +38,10 @@ flags_dict_ml_preprocessing = {
     "multicollinearity_threshold": 0.9,
     "feature_selection": True,
     "feature_selection_threshold": 0.8,
-    "bin_numeric_features": [],
+    "bin_numeric_features": ["EstimatedSalary"],
     "remove_low_variance": True,
     "remove_percentage": 0.8,
-    "info_pca": {},
+    "info_pca": {}, # {'all':('all',2)},
     "info_tsne": {},
     "info_stats": {'BalanceSalaryRatio':('div',['Balance','EstimatedSalary']),
               'TenureByAge':('div',['Tenure','Age']),

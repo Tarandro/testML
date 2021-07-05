@@ -506,6 +506,7 @@ class AutoNLP:
             data_test, doc_spacy_data_test = self.pre.transform(data_test)
         else:
             self.pre = Preprocessing(data_test, self.flags_parameters)
+            self.pre.load_parameters()
             data_test, doc_spacy_data_test = self.pre.transform(data_test)
             if self.pre.column_text is not None:
                 self.column_text = list(data_test.columns).index(self.pre.column_text)

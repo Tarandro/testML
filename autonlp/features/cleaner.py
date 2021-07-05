@@ -1,5 +1,5 @@
 import spacy
-
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
@@ -7,6 +7,8 @@ import random as rd
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
+from joblib import load, dump
+import pickle
 
 from ..utils.logging import get_logger
 from ..utils.nlp_preprocessing import small_clean_text, nlp_preprocessing_spacy, transform_entities
@@ -132,6 +134,9 @@ class Preprocessing:
 
         self.base_features = [col for col in list(data.columns) if col not in self.target]  # useful for pca / tsne in case of categorical features
 
+        self.outdir_pre = os.path.join(flags_parameters.outdir, "preprocessing")
+        os.makedirs(self.outdir_pre, exist_ok=True)
+
     def load_spacy_model(self, name_spacy_model="fr_core_news_md"):
         """ Download Spacy pre-train model
         Args:
@@ -157,6 +162,7 @@ class Preprocessing:
             else:
                 data[col] = interpolate_missing_data_categorical(data[col], self.method_nan_categorical)
         data[self.ordinal_features] = self.enc.fit_transform(data[self.ordinal_features])
+        dump(self.enc, os.path.join(self.outdir_pre, "ordinalencoder.pkl"))
 
         for col in self.type_columns['numeric']:
             if col not in self.ordinal_features and col in data.columns:
@@ -185,14 +191,16 @@ class Preprocessing:
                     if data[col].isnull().sum() > 0:
                         data[col] = interpolate_missing_data_numeric(data[col], self.method_nan_numeric)
 
+        self.apply_dummies = False
         for col_categorical in self.type_columns['categorical']:
             if col_categorical in data.columns:
                 self.apply_dummies = True
                 break
 
+        self.info_feat_categorical = {}
         if self.apply_dummies:
-            self.start_data = data.copy()
-            self.info_feat_categorical = {}
+            self.start_data = data.iloc[:100,:].copy()
+            self.start_data.to_csv(os.path.join(self.outdir_pre, "start_data.csv"), index=False)
 
             for col_categorical in self.type_columns['categorical']:
                 if col_categorical not in self.ordinal_features and col_categorical in data.columns:
@@ -244,6 +252,12 @@ class Preprocessing:
                     if data_test[col].isnull().sum() > 0:
                         data_test[col] = interpolate_missing_data_numeric(data_test[col], self.method_nan_numeric)
 
+        self.apply_dummies = False
+        for col_categorical in self.type_columns['categorical']:
+            if col_categorical in data_test.columns:
+                self.apply_dummies = True
+                break
+
         if self.apply_dummies:
             concat_data = pd.concat([self.start_data, data_test], axis=0, ignore_index=True)
 
@@ -260,35 +274,35 @@ class Preprocessing:
                         if col not in dummies_parallel.columns:
                             dummies = dummies.drop([col], axis=1)
 
-                if len(dummies.columns) != len(dummies_parallel.columns):
-                    print('error in one_hot encoding categorical')
+                    if len(dummies.columns) != len(dummies_parallel.columns):
+                        print('error in one_hot encoding categorical')
 
-                index_column = list(concat_data.columns).index(col_categorical)
-                order_columns = list(concat_data.columns)[:index_column] + list(dummies.columns) + list(
-                    concat_data.columns)[(index_column + 1):]
-                concat_data = pd.concat([dummies, concat_data.drop([col_categorical], axis=1)], axis=1)
-                concat_data = concat_data[order_columns]
+                    index_column = list(concat_data.columns).index(col_categorical)
+                    order_columns = list(concat_data.columns)[:index_column] + list(dummies.columns) + list(
+                        concat_data.columns)[(index_column + 1):]
+                    concat_data = pd.concat([dummies, concat_data.drop([col_categorical], axis=1)], axis=1)
+                    concat_data = concat_data[order_columns]
 
             data_test = concat_data[len(self.start_data):].reset_index(drop=True)  # !!!
         return data_test
 
     def build_feature_bin_numeric(self, data):
         dict_new_features = {}
-        self.infomation_feature_bin_numeric = {}
+        self.information_feature_bin_numeric = {}
         if len(self.bin_numeric_features) > 0:
             for col in self.bin_numeric_features:
                 # base on optimal number:
                 index_sample = rd.sample(list(data.index), int(len(data) * self.subsample))
-                best_n_clusters = find_optimal_number(data[[col]].loc[[index_sample]])
+                best_n_clusters = find_optimal_number(data[[col]].loc[index_sample])
                 kmeans = KMeans(n_clusters=best_n_clusters, random_state=0)
-                kmeans.fit(data[[col]].loc[[index_sample]])
+                kmeans.fit(data[[col]])
                 data[col + '_bin_' + str(best_n_clusters)] = kmeans.labels_
                 dict_new_features[col] = col + '_bin_' + str(best_n_clusters)
-                self.infomation_feature_bin_numeric[col] = (str(best_n_clusters), kmeans)
+                self.information_feature_bin_numeric[col] = (str(best_n_clusters), kmeans)
 
             features_importance = get_features_importance(data, self.Y, self.subsample, self.class_weight)
 
-            self.col_drop_bin_numeric = {}
+            self.col_drop_bin_numeric = []
             name_columns = data.columns
             for col in dict_new_features.keys():
                 importance_col = features_importance[list(name_columns).index(col)]
@@ -296,13 +310,17 @@ class Preprocessing:
                 if importance_col > importance_new_col:
                     data = data.drop([dict_new_features[col]], axis=1)
                     self.col_drop_bin_numeric.append(dict_new_features[col])
+
+        pickle.dump(self.information_feature_bin_numeric, open(os.path.join(self.outdir_pre, "information_feature_bin_numeric.pkl"), "wb"))
+        pickle.dump(self.col_drop_bin_numeric, open(os.path.join(self.outdir_pre, "col_drop_bin_numeric.pkl"), "wb"))
+
         return data
 
     def build_feature_bin_numeric_transform(self, data_test):
         if len(self.bin_numeric_features) > 0:
             for col in self.bin_numeric_features:
                 # base on optimal number:
-                best_n_clusters, kmeans = self.infomation_feature_bin_numeric[col]
+                best_n_clusters, kmeans = self.information_feature_bin_numeric[col]
                 if col + '_bin_' + best_n_clusters not in self.col_drop_bin_numeric:
                     data_test[col + '_bin_' + best_n_clusters] = kmeans.predict(data_test[[col]])
         return data_test
@@ -340,6 +358,7 @@ class Preprocessing:
                         del self.col_power_2[new_col]
                     #elif new_col in self.col_multi_polynomial.keys():
                     #    del self.col_multi_polynomial[new_col]
+        pickle.dump(self.col_power_2, open(os.path.join(self.outdir_pre, "col_power_2.pkl"), "wb"))
         return data
 
     def build_feature_polynomial_transform(self, data_test):
@@ -374,6 +393,7 @@ class Preprocessing:
                     data = data.drop([new_col], axis=1)
                     if new_col in self.col_multi_interaction.keys():
                         del self.col_multi_interaction[new_col]
+        pickle.dump(self.col_multi_interaction, open(os.path.join(self.outdir_pre, "col_multi_interaction.pkl"), "wb"))
         return data
 
     def build_feature_interaction_transform(self, data_test):
@@ -404,6 +424,7 @@ class Preprocessing:
                     data = data.drop([new_col], axis=1)
                     if new_col in self.col_ratio.keys():
                         del self.col_ratio[new_col]
+        pickle.dump(self.col_ratio, open(os.path.join(self.outdir_pre, "col_ratio.pkl"), "wb"))
         return data
 
     def build_feature_ratio_transform(self, data_test):
@@ -442,6 +463,7 @@ class Preprocessing:
             data, features, pca, columns = create_pca(data, name, self.info_pca[name][0], self.info_pca[name][1])
             if len(columns) > 0:
                 self.info_pca_for_transform[name] = (features, pca, columns)
+        pickle.dump(self.info_pca_for_transform, open(os.path.join(self.outdir_pre, "info_pca_for_transform.pkl"), "wb"))
         return data
 
     def build_fe_pca_transform(self, data_test):
@@ -483,6 +505,7 @@ class Preprocessing:
             data, features, tsne, columns = create_tsne(data, name, self.info_tsne[name][0], self.info_tsne[name][1])
             if len(columns) > 0:
                 self.info_tsne_for_transform[name] = (features, tsne, columns)
+        pickle.dump(self.info_tsne_for_transform, open(os.path.join(self.outdir_pre, "info_tsne_for_transform.pkl"), "wb"))
         return data
 
     def build_fe_tsne_transform(self, data_test):
@@ -536,19 +559,19 @@ class Preprocessing:
                     for col in features[1:]:
                         data_multi = data_multi * data[col]
                     name_column = 'multi_' + '_'.join(features)
-                    data[name_column[0:60]] = data_multi
-                    self.info_stats_for_transform[name] = ('multi', features, name_column[0:60])
+                    data[name] = data_multi
+                    self.info_stats_for_transform[name] = ('multi', features, name)
 
                 if 'div' in method:
                     if len(features) == 2:
-                        data[features[0] + '_ratio_' + features[1]] = np.round(data[features[0]] / (data[features[1]] + 0.001), 3)
-                        self.info_stats_for_transform[name] = ('div', features, features[0] + '_ratio_' + features[1])
+                        data[name] = np.round(data[features[0]] / (data[features[1]] + 0.001), 3)
+                        self.info_stats_for_transform[name] = ('div', features, name)
 
                 if 'power' in method:
                     for col in features:
-                        data[col + '_power2'] = data[col] ** 2
+                        data[name] = data[col] ** 2
                         data = data.drop([col], axis=1)
-                    self.info_stats_for_transform[name] = ('power', features, col + '_power2')
+                    self.info_stats_for_transform[name] = ('power', features, name)
 
         self.remove_column_correlation = []
         for name in self.info_stats_for_transform.keys():
@@ -559,6 +582,9 @@ class Preprocessing:
                         data = data.drop([col], axis=1)
                         print('column', col, 'removes due to high correlation (>0.85) with', col_name)
                         self.remove_column_correlation.append(col)
+
+        pickle.dump(self.info_stats_for_transform, open(os.path.join(self.outdir_pre, "info_stats_for_transform.pkl"), "wb"))
+        pickle.dump(self.remove_column_correlation, open(os.path.join(self.outdir_pre, "remove_column_correlation.pkl"), "wb"))
         return data
 
     def build_fe_stats_transform(self, data_test):
@@ -609,6 +635,7 @@ class Preprocessing:
         print('columns remove due to low variance :\n')
         print(self.columns_to_drop_variance)
         data = data.drop(self.columns_to_drop_variance, axis=1)
+        pickle.dump(self.columns_to_drop_variance, open(os.path.join(self.outdir_pre, "columns_to_drop_variance.pkl"), "wb"))
         return data
 
     def feature_selection_VarianceThreshold_transform(self, data_test):
@@ -638,6 +665,7 @@ class Preprocessing:
         print('columns remove due to high multicollinearity :\n')
         print(self.columns_to_drop_multicollinearity)
         data = data.drop(self.columns_to_drop_multicollinearity, axis=1)
+        pickle.dump(self.columns_to_drop_multicollinearity, open(os.path.join(self.outdir_pre, "columns_to_drop_multicollinearity.pkl"), "wb"))
         return data
 
     def fct_remove_multicollinearity_transform(self, data_test):
@@ -657,6 +685,7 @@ class Preprocessing:
         self.columns_to_drop_importance = list(name_columns_sorted)[nb_column_to_keep:]
         print(self.columns_to_drop_importance)
         data = data.drop(self.columns_to_drop_importance, axis=1)
+        pickle.dump(self.columns_to_drop_importance, open(os.path.join(self.outdir_pre, "columns_to_drop_importance.pkl"), "wb"))
         return data
 
     def select_feature_by_importance_transform(self, data_test):
@@ -806,6 +835,7 @@ class Preprocessing:
             data[self.column_text] = list_texts
 
         self.list_final_columns = list(data.columns)
+        pickle.dump(self.list_final_columns, open(os.path.join(self.outdir_pre, "list_final_columns.pkl"), "wb"))
 
         return data, doc_spacy_data
 
@@ -857,3 +887,65 @@ class Preprocessing:
                 print(col, 'is not in test data')
 
         return data_test, doc_spacy_data_test
+
+    def load_parameters(self):
+        try:
+            self.enc = load(os.path.join(self.outdir_pre, "ordinalencoder.pkl"))
+        except:
+            pass
+        try:
+            self.start_data = pd.read_csv(os.path.join(self.outdir_pre, "start_data.csv"))
+        except:
+            pass
+        try:
+            self.information_feature_bin_numeric = pickle.load(open(os.path.join(self.outdir_pre, "information_feature_bin_numeric.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.col_drop_bin_numeric = pickle.load(open(os.path.join(self.outdir_pre, "col_drop_bin_numeric.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.col_power_2 = pickle.load(open(os.path.join(self.outdir_pre, "col_power_2.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.col_multi_interaction = pickle.load(open(os.path.join(self.outdir_pre, "col_multi_interaction.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.col_ratio = pickle.load(open(os.path.join(self.outdir_pre, "col_ratio.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.info_pca_for_transform = pickle.load(open(os.path.join(self.outdir_pre, "info_pca_for_transform.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.info_tsne_for_transform = pickle.load(open(os.path.join(self.outdir_pre, "info_tsne_for_transform.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.info_stats_for_transform = pickle.load(open(os.path.join(self.outdir_pre, "info_stats_for_transform.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.remove_column_correlation = pickle.load(open(os.path.join(self.outdir_pre, "remove_column_correlation.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.columns_to_drop_variance = pickle.load(open(os.path.join(self.outdir_pre, "columns_to_drop_variance.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.columns_to_drop_multicollinearity = pickle.load(open(os.path.join(self.outdir_pre, "columns_to_drop_multicollinearity.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.columns_to_drop_importance = pickle.load(open(os.path.join(self.outdir_pre, "columns_to_drop_importance.pkl"), "rb"))
+        except:
+            pass
+        try:
+            self.list_final_columns = pickle.load(open(os.path.join(self.outdir_pre, "list_final_columns.pkl"), "rb"))
+        except:
+            pass
