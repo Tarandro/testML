@@ -8,7 +8,7 @@ import os
 import json
 import numpy as np
 
-from ...models.classifier.trainer import Model
+from ...models.classifier_nlp.trainer import Model
 from hyperopt import hp
 
 

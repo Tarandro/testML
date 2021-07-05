@@ -1,15 +1,16 @@
-from ...models.classifier.trainer import Model
-from sklearn.naive_bayes import MultinomialNB
+from ...models.classifier_nlp.trainer import Model
+from sklearn.linear_model import LogisticRegression
 from spacy.lang.fr.stop_words import STOP_WORDS as fr_stop
 from spacy.lang.en.stop_words import STOP_WORDS as en_stop
 from hyperopt import hp
+import numpy as np
 from sklearn.pipeline import Pipeline
 import os
 import json
 
 
-class Naive_Bayes(Model):
-    name_classifier = 'Naive_Bayes'
+class Logistic_Regression(Model):
+    name_classifier = 'Logistic_Regression'
     dimension_embedding = "doc_embedding"
     is_NN = False
 
@@ -19,19 +20,25 @@ class Naive_Bayes(Model):
     def hyper_params(self, size_params='small'):
         parameters = dict()
         if size_params == 'small':
-            # parameters['clf__alpha'] = uniform(self.flags_parameters.nb_alpha_min, self.flags_parameters.nb_alpha_max)
-            if self.flags_parameters.nb_alpha_min == self.flags_parameters.nb_alpha_max:
-                parameters['clf__alpha'] = hp.choice('clf__alpha', [self.flags_parameters.nb_alpha_min])
+            # parameters['clf__C'] = loguniform(self.flags_parameters.logr_C_min, self.flags_parameters.logr_C_max)
+            # parameters['clf__penalty'] = self.flags_parameters.logr_penalty
+            if self.flags_parameters.logr_C_min == self.flags_parameters.logr_C_max:
+                parameters['clf__C'] = hp.choice('clf__C', [self.flags_parameters.logr_C_min])
             else:
-                parameters['clf__alpha'] = hp.uniform('clf__alpha', self.flags_parameters.nb_alpha_min,
-                                                      self.flags_parameters.nb_alpha_max)
+                parameters['clf__C'] = hp.loguniform('clf__C', np.log(self.flags_parameters.logr_C_min),
+                                                     np.log(self.flags_parameters.logr_C_max))
+            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.logr_penalty)
         else:
-            # parameters['clf__alpha'] = uniform(self.flags_parameters.nb_alpha_min, self.flags_parameters.nb_alpha_max)
-            if self.flags_parameters.nb_alpha_min == self.flags_parameters.nb_alpha_max:
-                parameters['clf__alpha'] = hp.choice('clf__alpha', [self.flags_parameters.nb_alpha_min])
+            # parameters['clf__C'] = loguniform(self.flags_parameters.logr_C_min, self.flags_parameters.logr_C_max)
+            # parameters['clf__penalty'] = self.flags_parameters.logr_penalty  # ['l2', 'l1', 'elasticnet', 'None']
+            # parameters['clf__max__iter'] = randint(50, 150)
+            if self.flags_parameters.logr_C_min == self.flags_parameters.logr_C_max:
+                parameters['clf__C'] = hp.choice('clf__C', [self.flags_parameters.logr_C_min])
             else:
-                parameters['clf__alpha'] = hp.uniform('clf__alpha', self.flags_parameters.nb_alpha_min,
-                                                      self.flags_parameters.nb_alpha_max)
+                parameters['clf__C'] = hp.loguniform('clf__C', np.log(self.flags_parameters.logr_C_min),
+                                                     np.log(self.flags_parameters.logr_C_max))
+            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.logr_penalty)
+            parameters['clf__max__iter'] = hp.uniform('clf__max__iter', 50, 150)
 
         if self.embedding.name_model in ['tf', 'tf-idf']:
             parameters_embedding = self.embedding.hyper_params()
@@ -86,10 +93,12 @@ class Naive_Bayes(Model):
         self.embedding.load_params(params_all, outdir)
 
     def model(self, hyper_params_clf={}):
-        clf = MultinomialNB(
+        clf = LogisticRegression(
+            random_state=self.seed,
+            class_weight=self.class_weight,
+            solver="saga",
             **hyper_params_clf
         )
-
         if self.embedding.name_model in ['tf', 'tf-idf']:
             vect = self.embedding.model()
             pipeline = Pipeline(steps=[('vect', vect), ('clf', clf)])

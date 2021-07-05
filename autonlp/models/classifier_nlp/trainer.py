@@ -21,7 +21,7 @@ class Model:
             - prediction on test set for each fold of a model : function : prediction()
     """
 
-    def __init__(self, flags_parameters, name_model_full, class_weight=None):
+    def __init__(self, flags_parameters, embedding, name_model_full, column_text, class_weight=None):
         """
         Args:
             flags_parameters : Instance of Flags class object
@@ -39,6 +39,9 @@ class Model:
         """
         self.flags_parameters = flags_parameters
 
+        self.embedding = embedding(flags_parameters, column_text, self.dimension_embedding)
+
+        self.column_text = column_text
         self.objective = flags_parameters.objective
         self.average_scoring = flags_parameters.average_scoring
         self.apply_mlflow = flags_parameters.apply_mlflow
@@ -53,7 +56,7 @@ class Model:
         self.best_cv_score = 0.0
         self.df_all_results = pd.DataFrame()
         self.info_scores = {}
-        self.apply_autonlp = False
+        self.apply_autonlp = True
 
         if self.apply_mlflow:
             import mlflow
@@ -197,7 +200,7 @@ class Model:
               y_val (Dataframe)
         """
 
-        val = Validation(self.objective, self.seed, self.is_NN, self.name_classifier, self.name_model_full,
+        val = Validation(self.objective, self.seed, self.is_NN, self.embedding.name_model, self.name_model_full,
                          self.class_weight, self.average_scoring, self.apply_mlflow, self.experiment_name,
                          self.apply_logs, self.apply_autonlp)
         val.fit(model, x_train, y_train, x_val, y_val, self.flags_parameters.nfolds, self.flags_parameters.nfolds_train,
@@ -239,7 +242,12 @@ class Model:
         # get path of models :
         has_saved_model = False
         if self.apply_logs:
-            outdir_model = os.path.join(self.flags_parameters.outdir, name_logs, self.name_classifier)
+            if self.embedding.name_model == "transformer":
+                outdir_model = os.path.join(self.flags_parameters.outdir, name_logs, self.embedding.name_model,
+                                            self.name_model_full)
+            else:
+                outdir_model = os.path.join(self.flags_parameters.outdir, name_logs, self.embedding.name_model,
+                                            self.name_model_full.split('+')[1])
             # get path of model folds :
             try:
                 model_fold_paths = glob(outdir_model + '/fold*')
@@ -277,19 +285,19 @@ class Model:
             y_test = None
 
         if has_saved_model:
-            pred = Prediction(self.objective, self.name_classifier, self.name_model_full, self.flags_parameters.outdir,
+            pred = Prediction(self.objective, self.embedding.name_model, self.name_model_full, self.flags_parameters.outdir,
                               name_logs, self.is_NN, self.class_weight, self.apply_mlflow, self.experiment_name,
                               self.apply_logs, self.apply_app, self.apply_autonlp)
 
             # preprocess text on x_test :
-            #if self.embedding.name_model not in ['tf', 'tf-idf']:
-            #    x_test = self.embedding.preprocessing_transform(x_test)
-            #else:
-            #    x_test_preprocessed = self.embedding.preprocessing_transform(x_test, doc_spacy_data_test)
-            #    if isinstance(x_test_preprocessed, dict):
-            #        x_test = x_test_preprocessed
-            #    else:
-            #        x_test[x_test.columns[self.column_text]] = x_test_preprocessed
+            if self.embedding.name_model not in ['tf', 'tf-idf']:
+                x_test = self.embedding.preprocessing_transform(x_test)
+            else:
+                x_test_preprocessed = self.embedding.preprocessing_transform(x_test, doc_spacy_data_test)
+                if isinstance(x_test_preprocessed, dict):
+                    x_test = x_test_preprocessed
+                else:
+                    x_test[x_test.columns[self.column_text]] = x_test_preprocessed
 
             # use label map if labels are not numerics
             if y_test is not None:
@@ -302,7 +310,8 @@ class Model:
                     reverse_map_label = {v: k for k, v in self.flags_parameters.map_label.items()}
                 elif y_test.shape[1] > 1 and self.flags_parameters.map_label != {}:
                     for i in range(y_test.shape[1]):
-                        if i in self.flags_parameters.map_label.keys() and y_test[y_test.columns[i]].iloc[0] in self.flags_parameters.map_label.keys():
+                        if i in self.flags_parameters.map_label.keys() and y_test[y_test.columns[i]].iloc[
+                            0] in self.flags_parameters.map_label.keys():
                             y_test[y_test.columns[i]] = y_test[y_test.columns[i]].map(self.flags_parameters.map_label)
 
             # Init model architecture : (need for tensorflow model because we only save model weights)
@@ -344,8 +353,9 @@ class Model:
                     self.info_scores['mse_test'], self.info_scores['rmse_test'], self.info_scores[
                         'explained_variance_test'], self.info_scores['r2_test'] = 0.0, 0.0, 0.0, 0.0
 
-    def automl(self, x_train_before, y_train=None, x_val_before=None, y_val=None,
-                apply_optimization=True, apply_validation=True):
+    def autonlp(self, x_train_before, y_train=None, x_val_before=None, y_val=None,
+                apply_optimization=True, apply_validation=True, method_embedding={},
+                doc_spacy_data_train=[], doc_spacy_data_val=[]):
         """ Apply fit_optimization and validation on the best model from hyperopt optimization if apply_validation
             is True else on model from self.flags_parameters.path_models_parameters
         Args:
@@ -355,6 +365,9 @@ class Model:
             y_val (Dataframe)
             apply_optimization (Boolean)
             apply_validation (Boolean)
+            method_embedding (str) name of embedding method or path of embedding weights
+            doc_spacy_data_train (List[spacy object])
+            doc_spacy_data_val (List[spacy object])
         """
 
         x_train = x_train_before.copy()
@@ -362,6 +375,8 @@ class Model:
             x_val = x_val_before.copy()
         else:
             x_val = None
+
+        self.method_embedding = method_embedding
 
         # use a model from self.flags_parameters.path_models_parameters if do not want to apply Optimization
         if not apply_optimization:
@@ -371,6 +386,7 @@ class Model:
                     params_all = json.load(json_file)
                 params_all = params_all[self.name_model_full]
                 self.load_params(params_all, os.path.dirname(self.flags_parameters.path_models_parameters))  # dirname!
+                self.embedding.load_params(params_all, os.path.dirname(self.flags_parameters.path_models_parameters))
             except:
                 if self.apply_logs:
                     path_models_parameters = os.path.join(self.flags_parameters.outdir, "models_best_parameters.json")
@@ -385,6 +401,7 @@ class Model:
                             path_models_parameters))
                     params_all = params_all[self.name_model_full]
                     self.load_params(params_all, os.path.dirname(self.flags_parameters.path_models_parameters))
+                    self.embedding.load_params(params_all, os.path.dirname(self.flags_parameters.path_models_parameters))
                 except:
                     logger.error(
                         "Did not find name model : {} in '{}', Random parameters from Parameters optimization are used".format(
@@ -392,24 +409,24 @@ class Model:
                     apply_optimization = True
 
         # preprocess text on x_train :
-        #if self.embedding.name_model not in ['tf', 'tf-idf']:
-        #    x_train = self.embedding.preprocessing_fit_transform(x_train, self.flags_parameters.size_params,
-        #                                                         self.method_embedding)
-        #    if x_val is not None:
-        #        x_val = self.embedding.preprocessing_transform(x_val)
-        #else:
-        #    x_train_preprocessed = self.embedding.preprocessing_fit_transform(x_train, doc_spacy_data_train,
-        #                                                                      self.method_embedding)
-        #    if x_val is not None:
-        #        x_val_preprocessed = self.embedding.preprocessing_transform(x_val, doc_spacy_data_val)
-        #    if isinstance(x_train_preprocessed, dict):
-        #        x_train = x_train_preprocessed
-        #        if x_val is not None:
-        #            x_val = x_val_preprocessed
-        #    else:
-        #        x_train[x_train.columns[self.column_text]] = x_train_preprocessed
-        #        if x_val is not None:
-        #            x_val[x_val.columns[self.column_text]] = x_val_preprocessed
+        if self.embedding.name_model not in ['tf', 'tf-idf']:
+            x_train = self.embedding.preprocessing_fit_transform(x_train, self.flags_parameters.size_params,
+                                                                 self.method_embedding)
+            if x_val is not None:
+                x_val = self.embedding.preprocessing_transform(x_val)
+        else:
+            x_train_preprocessed = self.embedding.preprocessing_fit_transform(x_train, doc_spacy_data_train,
+                                                                              self.method_embedding)
+            if x_val is not None:
+                x_val_preprocessed = self.embedding.preprocessing_transform(x_val, doc_spacy_data_val)
+            if isinstance(x_train_preprocessed, dict):
+                x_train = x_train_preprocessed
+                if x_val is not None:
+                    x_val = x_val_preprocessed
+            else:
+                x_train[x_train.columns[self.column_text]] = x_train_preprocessed
+                if x_val is not None:
+                    x_val[x_val.columns[self.column_text]] = x_val_preprocessed
 
         ###############
         # Optimization
@@ -424,9 +441,12 @@ class Model:
 
         # save params in path : 'outdir/last_logs/name_embedding/name_model_full'
         if self.apply_logs:
-            outdir_embedding = os.path.join(self.flags_parameters.outdir, 'last_logs', self.name_classifier)
+            outdir_embedding = os.path.join(self.flags_parameters.outdir, 'last_logs', self.embedding.name_model)
             os.makedirs(outdir_embedding, exist_ok=True)
-            outdir_model = os.path.join(outdir_embedding, self.name_model_full)
+            if self.embedding.name_model == "transformer":
+                outdir_model = os.path.join(outdir_embedding, self.name_model_full)
+            else:
+                outdir_model = os.path.join(outdir_embedding, self.name_model_full.split('+')[1])
             os.makedirs(outdir_model, exist_ok=True)
             self.save_params(outdir_model)
         else:

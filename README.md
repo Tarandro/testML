@@ -123,6 +123,6 @@ indicated in flags.path_models_parameters
 
 - [Preprocessing](autonlp/features/README.md)
 - [Embeddings](autonlp/features/embeddings/README.md)
-- [Classifiers](autonlp/models/classifier/README.md)
+- [Classifiers](autonlp/models/classifier_nlp/README.md)
 - [UML](AutoNLP%20UML.png)
 - [Classes](autonlp/README.md)

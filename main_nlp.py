@@ -21,7 +21,7 @@ flags_dict_info = {
 }
 flags_dict_ml_preprocessing = {
 
-    "ordinal_features": ["Geography"],
+    "ordinal_features": [],  # "Geography"
     "normalize": True,
     "method_scaling": 'MinMaxScaler',   # 'MinMaxScaler', 'RobustScaler', 'StandardScaler'
     "type_columns": None,
@@ -31,21 +31,21 @@ flags_dict_ml_preprocessing = {
     "method_nan_categorical": 'constant',
     "method_nan_numeric": 'mean',
     "subsample": 0.3,
-    "feature_interaction": True,
-    "feature_ratio": True,
-    "polynomial_features": True,
-    "remove_multicollinearity": True,
+    "feature_interaction": False,
+    "feature_ratio": False,
+    "polynomial_features": False,
+    "remove_multicollinearity": False,
     "multicollinearity_threshold": 0.9,
-    "feature_selection": True,
+    "feature_selection": False,
     "feature_selection_threshold": 0.8,
     "bin_numeric_features": ["EstimatedSalary"],
-    "remove_low_variance": True,
+    "remove_low_variance": False,
     "remove_percentage": 0.8,
     "info_pca": {}, # {'all':('all',2)},
     "info_tsne": {},
-    "info_stats": {'BalanceSalaryRatio':('div',['Balance','EstimatedSalary']),
-              'TenureByAge':('div',['Tenure','Age']),
-              'CreditScoreGivenAge':('div',['CreditScore','Age'])}
+    "info_stats": {}  # {'BalanceSalaryRatio':('div',['Balance','EstimatedSalary']),
+                      # 'TenureByAge':('div',['Tenure','Age']),
+                      # 'CreditScoreGivenAge':('div',['CreditScore','Age'])}
 }
 
 flags_dict_ts_preprocessing = {
@@ -72,7 +72,7 @@ flags_dict_nlp_preprocessing = {
 
 flags_dict_autonlp = {
     "objective": 'binary',    # 'binary' or 'multi-class' or 'regression'
-    "include_model": ['tf-idf+Logistic_Regression'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
+    "include_model": ['Logistic_Regression'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
     "max_run_time_per_model": 10,
     "frac_trainset": 0.7,
     "scoring": 'f1',
@@ -119,12 +119,11 @@ if __name__ == '__main__':
     #####################
 
     autonlp.data_preprocessing()
-    import pandas as pd
-    data = pd.read_csv(flags.path_data)
-    c = data[100:150].reset_index(drop=True)
-    data_test, doc_spacy_data_test, y_test = autonlp.preprocess_test_data(c)
+    #import pandas as pd
+    #data = pd.read_csv(flags.path_data)
+    #c = data[100:150].reset_index(drop=True)
+    #data_test, doc_spacy_data_test, y_test = autonlp.preprocess_test_data(c)
 
-if False:
     autonlp.data.to_csv('./results/data_preprocessed.csv', index=False)
     autonlp.X_train.to_csv('./results/X_train.csv', index=False)
     autonlp.X_test.to_csv('./results/X_test.csv', index=False)
@@ -189,10 +188,14 @@ if False:
     import pandas as pd
     data_test = pd.read_csv(flags.path_data)
 
-    X_test = data_test[[flags.column_text]].copy()
-    Y_test = data_test[[flags.target]].copy()
+    #X_test = data_test[[flags.column_text]].copy()
+    X_test = data_test.copy()
+    if isinstance(flags.target, list):
+        Y_test = data_test[flags.target].copy()
+    else:
+        Y_test = data_test[[flags.target]].copy()
 
-    X_test, doc_spacy_data_test = autonlp.preprocess_test_data(X_test)
+    X_test, doc_spacy_data_test, y_test = autonlp.preprocess_test_data(X_test)
 
     name_logs = 'best_logs'
     on_test_data = False

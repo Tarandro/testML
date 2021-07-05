@@ -6,7 +6,7 @@ from autonlp.flags import Flags, load_yaml
 from fastapi import FastAPI
 from fastapi import File, UploadFile, Body
 import autonlp.autonlp as base
-import autonlp.models.classifier.trainer as nlp
+import autonlp.models.classifier_nlp.trainer as nlp
 import pandas as pd
 import numpy as np
 from fastapi import HTTPException
@@ -68,7 +68,7 @@ async def get_prediction(text: Optional[str] = "Le marché Français a diminué 
 
     # y=data[base.autonlp.target]
     dict_prediction, scores = base.autonlp.single_prediction(x=data_test, y=y_test, proba=False,
-                                                        model_nlp=nlp.model_nlp, loaded_models=nlp.loaded_models,
+                                                        model_ml=nlp.model_nlp, loaded_models=nlp.loaded_models,
                                                         return_scores=True)
 
     dict_prediction = {"prediction": dict_prediction["prediction"].reshape(-1).tolist(),
@@ -102,7 +102,7 @@ async def get_prediction(text: Optional[str] = "Le marché Français a diminué 
 
     # y=data[base.autonlp.target]
     prediction, scores = base.autonlp.single_prediction(x=data_test, y=y_test,
-                                                        model_nlp=nlp.model_nlp, loaded_models=nlp.loaded_models,
+                                                        model_ml=nlp.model_nlp, loaded_models=nlp.loaded_models,
                                                         return_scores=True)
 
     dict_prediction = {}

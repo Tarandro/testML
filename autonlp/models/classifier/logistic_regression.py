@@ -1,21 +1,18 @@
 from ...models.classifier.trainer import Model
 from sklearn.linear_model import LogisticRegression
-from spacy.lang.fr.stop_words import STOP_WORDS as fr_stop
-from spacy.lang.en.stop_words import STOP_WORDS as en_stop
+from sklearn.multioutput import MultiOutputClassifier
 from hyperopt import hp
 import numpy as np
-from sklearn.pipeline import Pipeline
 import os
 import json
 
 
-class Logistic_Regression(Model):
+class ML_Logistic_Regression(Model):
     name_classifier = 'Logistic_Regression'
-    dimension_embedding = "doc_embedding"
     is_NN = False
 
-    def __init__(self, flags_parameters, embedding, name_model_full, column_text, class_weight=None):
-        Model.__init__(self, flags_parameters, embedding, name_model_full, column_text, class_weight)
+    def __init__(self, flags_parameters, name_model_full, class_weight=None):
+        Model.__init__(self, flags_parameters, name_model_full, class_weight)
 
     def hyper_params(self, size_params='small'):
         parameters = dict()
@@ -23,26 +20,22 @@ class Logistic_Regression(Model):
             # parameters['clf__C'] = loguniform(self.flags_parameters.logr_C_min, self.flags_parameters.logr_C_max)
             # parameters['clf__penalty'] = self.flags_parameters.logr_penalty
             if self.flags_parameters.logr_C_min == self.flags_parameters.logr_C_max:
-                parameters['clf__C'] = hp.choice('clf__C', [self.flags_parameters.logr_C_min])
+                parameters['C'] = hp.choice('C', [self.flags_parameters.logr_C_min])
             else:
-                parameters['clf__C'] = hp.loguniform('clf__C', np.log(self.flags_parameters.logr_C_min),
+                parameters['C'] = hp.loguniform('C', np.log(self.flags_parameters.logr_C_min),
                                                      np.log(self.flags_parameters.logr_C_max))
-            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.logr_penalty)
+            parameters['penalty'] = hp.choice('penalty', self.flags_parameters.logr_penalty)
         else:
             # parameters['clf__C'] = loguniform(self.flags_parameters.logr_C_min, self.flags_parameters.logr_C_max)
             # parameters['clf__penalty'] = self.flags_parameters.logr_penalty  # ['l2', 'l1', 'elasticnet', 'None']
             # parameters['clf__max__iter'] = randint(50, 150)
             if self.flags_parameters.logr_C_min == self.flags_parameters.logr_C_max:
-                parameters['clf__C'] = hp.choice('clf__C', [self.flags_parameters.logr_C_min])
+                parameters['C'] = hp.choice('C', [self.flags_parameters.logr_C_min])
             else:
-                parameters['clf__C'] = hp.loguniform('clf__C', np.log(self.flags_parameters.logr_C_min),
+                parameters['C'] = hp.loguniform('C', np.log(self.flags_parameters.logr_C_min),
                                                      np.log(self.flags_parameters.logr_C_max))
-            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.logr_penalty)
-            parameters['clf__max__iter'] = hp.uniform('clf__max__iter', 50, 150)
-
-        if self.embedding.name_model in ['tf', 'tf-idf']:
-            parameters_embedding = self.embedding.hyper_params()
-            parameters.update(parameters_embedding)
+            parameters['penalty'] = hp.choice('penalty', self.flags_parameters.logr_penalty)
+            parameters['max_iter'] = hp.uniform('max_iter', 50, 150)
 
         return parameters
 
@@ -54,17 +47,8 @@ class Logistic_Regression(Model):
         params_all = dict()
 
         p_model = self.p.copy()
-        # list of stop_words is transformed in boolean
-        if 'vect__text__tf__stop_words' in p_model.keys() and p_model['vect__text__tf__stop_words'] is not None:
-            p_model['vect__text__tf__stop_words'] = True
-        if 'vect__tf__stop_words' in p_model.keys() and p_model['vect__tf__stop_words'] is not None:
-            p_model['vect__tf__stop_words'] = True
         params_all['p_model'] = p_model
         params_all['name_classifier'] = self.name_classifier
-        params_all['language_text'] = self.flags_parameters.language_text
-
-        params_embedding = self.embedding.save_params(outdir_model)
-        params_all.update(params_embedding)
 
         self.params_all = {self.name_model_full: params_all}
 
@@ -73,24 +57,8 @@ class Logistic_Regression(Model):
                 json.dump(self.params_all, outfile)
 
     def load_params(self, params_all, outdir):
-        if params_all['language_text'] == 'fr':
-            stopwords = list(fr_stop)
-        else:
-            stopwords = list(en_stop)
         p_model = params_all['p_model']
-        # list of stop_words need to be boolean
-        if 'vect__text__tf__stop_words' in p_model.keys() and p_model['vect__text__tf__stop_words']:
-            p_model['vect__text__tf__stop_words'] = stopwords
-        if 'vect__tf__stop_words' in p_model.keys() and p_model['vect__tf__stop_words']:
-            p_model['vect__tf__stop_words'] = stopwords
-        if 'vect__text__tfidf__stop_words' in p_model.keys() and p_model['vect__text__tfidf__stop_words']:
-            p_model['vect__text__tfidf__stop_words'] = stopwords
-        if 'vect__tfidf__stop_words' in p_model.keys() and p_model['vect__tfidf__stop_words']:
-            p_model['vect__tfidf__stop_words'] = stopwords
-
         self.p = p_model
-
-        self.embedding.load_params(params_all, outdir)
 
     def model(self, hyper_params_clf={}):
         clf = LogisticRegression(
@@ -99,12 +67,10 @@ class Logistic_Regression(Model):
             solver="saga",
             **hyper_params_clf
         )
-        if self.embedding.name_model in ['tf', 'tf-idf']:
-            vect = self.embedding.model()
-            pipeline = Pipeline(steps=[('vect', vect), ('clf', clf)])
-            pipeline.set_params(**self.p)
 
+        clf.set_params(**self.p)
+
+        if self.shape_y == 1:
+            return clf
         else:
-            pipeline = Pipeline(steps=[('clf', clf)])
-            pipeline.set_params(**self.p)
-        return pipeline
+            return MultiOutputClassifier(clf)

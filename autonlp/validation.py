@@ -22,14 +22,15 @@ class Validation:
     """ Class validation/cross-validation """
 
     def __init__(self, objective, seed=15, is_NN=False, name_embedding=None, name_model_full=None, class_weight=None,
-                 average_scoring="weighted", apply_mlflow=False, experiment_name="Experiment", apply_logs=True):
+                 average_scoring="weighted", apply_mlflow=False, experiment_name="Experiment", apply_logs=True,
+                 apply_autonlp=False):
         """
         Args:
             objective (str) : 'binary' or 'multi-class' or 'regression'
             seed (int)
             is_NN (Boolean) True if the model is a Neural Network
             name_model (str) : general name of model
-            name_model_full (str) : full name of model (embedding+classifier+tag)
+            name_model_full (str) : full name of model (embedding+classifier_nlp+tag)
             class_weight (None or 'balanced')
             average_scoring (str) : 'micro', 'macro' or 'weighted'
             apply_mlflow (Boolean)
@@ -46,6 +47,7 @@ class Validation:
         self.path_mlflow = "../mlruns"
         self.experiment_name = experiment_name
         self.apply_logs = apply_logs
+        self.apply_autonlp = apply_autonlp
 
     def fit(self, model, x, y, x_valid=None, y_valid=None, nfolds=5, nfolds_train=5, cv_strategy="StratifiedKFold",
             scoring='accuracy', outdir='./', params_all=dict(), batch_size=16, patience=4, epochs=60, min_lr=1e-4):
@@ -88,10 +90,13 @@ class Validation:
         if self.apply_logs:
             outdir_embedding = os.path.join(outdir, 'last_logs', self.name_embedding)
             os.makedirs(outdir_embedding, exist_ok=True)
-            if self.name_embedding.lower() == "transformer":
-                outdir_model = os.path.join(outdir_embedding, self.name_model_full)
+            if self.apply_autonlp:
+                if self.name_embedding.lower() == "transformer":
+                    outdir_model = os.path.join(outdir_embedding, self.name_model_full)
+                else:
+                    outdir_model = os.path.join(outdir_embedding, self.name_model_full.split('+')[1])
             else:
-                outdir_model = os.path.join(outdir_embedding, self.name_model_full.split('+')[1])
+                outdir_model = os.path.join(outdir_embedding, self.name_model_full)
             os.makedirs(outdir_model, exist_ok=True)
 
         if self.apply_mlflow:

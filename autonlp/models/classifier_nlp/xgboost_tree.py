@@ -1,4 +1,4 @@
-from ...models.classifier.trainer import Model
+from ...models.classifier_nlp.trainer import Model
 from hyperopt import hp
 from spacy.lang.fr.stop_words import STOP_WORDS as fr_stop
 from spacy.lang.en.stop_words import STOP_WORDS as en_stop

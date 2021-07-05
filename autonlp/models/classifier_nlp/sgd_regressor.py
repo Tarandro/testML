@@ -1,5 +1,5 @@
-from ...models.classifier.trainer import Model
-from sklearn.linear_model import SGDClassifier
+from ...models.classifier_nlp.trainer import Model
+from sklearn.linear_model import SGDRegressor
 from spacy.lang.fr.stop_words import STOP_WORDS as fr_stop
 from spacy.lang.en.stop_words import STOP_WORDS as en_stop
 from hyperopt import hp
@@ -9,8 +9,8 @@ import os
 import json
 
 
-class SGD_Classifier(Model):
-    name_classifier = 'SGD_Classifier'
+class SGD_Regressor(Model):
+    name_classifier = 'SGD_Regressor'
     dimension_embedding = "doc_embedding"
     is_NN = False
 
@@ -29,8 +29,8 @@ class SGD_Classifier(Model):
             else:
                 parameters['clf__alpha'] = hp.loguniform('clf__alpha', np.log(self.flags_parameters.sgd_alpha_min),
                                                          np.log(self.flags_parameters.sgd_alpha_max))
-            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.sgdc_penalty)
-            parameters['clf__loss'] = hp.choice('clf__loss', self.flags_parameters.sgdc_loss)
+            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.sgdr_penalty)
+            parameters['clf__loss'] = hp.choice('clf__loss', self.flags_parameters.sgdr_loss)
         else:
             # parameters['clf__alpha'] = loguniform(self.flags_parameters.sgd_alpha_min,
             #                                           self.flags_parameters.sgd_alpha_max)
@@ -41,8 +41,8 @@ class SGD_Classifier(Model):
             else:
                 parameters['clf__alpha'] = hp.loguniform('clf__alpha', np.log(self.flags_parameters.sgd_alpha_min),
                                                          np.log(self.flags_parameters.sgd_alpha_max))
-            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.sgdc_penalty)
-            parameters['clf__loss'] = hp.choice('clf__loss', self.flags_parameters.sgdc_loss)
+            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.sgdr_penalty)
+            parameters['clf__loss'] = hp.choice('clf__loss', self.flags_parameters.sgdr_loss)
 
         if self.embedding.name_model in ['tf', 'tf-idf']:
             parameters_embedding = self.embedding.hyper_params()
@@ -97,9 +97,8 @@ class SGD_Classifier(Model):
         self.embedding.load_params(params_all, outdir)
 
     def model(self, hyper_params_clf={}):
-        clf = SGDClassifier(
+        clf = SGDRegressor(
             random_state=self.seed,
-            class_weight=self.class_weight,
             early_stopping=True,
             **hyper_params_clf
         )

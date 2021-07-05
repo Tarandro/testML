@@ -1,16 +1,15 @@
-from ...models.classifier.trainer import Model
-from sklearn.linear_model import SGDRegressor
+from ...models.classifier_nlp.trainer import Model
+from sklearn.naive_bayes import MultinomialNB
 from spacy.lang.fr.stop_words import STOP_WORDS as fr_stop
 from spacy.lang.en.stop_words import STOP_WORDS as en_stop
 from hyperopt import hp
-import numpy as np
 from sklearn.pipeline import Pipeline
 import os
 import json
 
 
-class SGD_Regressor(Model):
-    name_classifier = 'SGD_Regressor'
+class Naive_Bayes(Model):
+    name_classifier = 'Naive_Bayes'
     dimension_embedding = "doc_embedding"
     is_NN = False
 
@@ -20,29 +19,19 @@ class SGD_Regressor(Model):
     def hyper_params(self, size_params='small'):
         parameters = dict()
         if size_params == 'small':
-            # parameters['clf__alpha'] = loguniform(self.flags_parameters.sgd_alpha_min,
-            #                                           self.flags_parameters.sgd_alpha_max)
-            # parameters['clf__penalty'] = self.flags_parameters.sgd_penalty
-            # parameters['clf__loss'] = self.flags_parameters.sgd_loss
-            if self.flags_parameters.sgd_alpha_min == self.flags_parameters.sgd_alpha_max:
-                parameters['clf__alpha'] = hp.choice('clf__alpha', [self.flags_parameters.sgd_alpha_min])
+            # parameters['clf__alpha'] = uniform(self.flags_parameters.nb_alpha_min, self.flags_parameters.nb_alpha_max)
+            if self.flags_parameters.nb_alpha_min == self.flags_parameters.nb_alpha_max:
+                parameters['clf__alpha'] = hp.choice('clf__alpha', [self.flags_parameters.nb_alpha_min])
             else:
-                parameters['clf__alpha'] = hp.loguniform('clf__alpha', np.log(self.flags_parameters.sgd_alpha_min),
-                                                         np.log(self.flags_parameters.sgd_alpha_max))
-            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.sgdr_penalty)
-            parameters['clf__loss'] = hp.choice('clf__loss', self.flags_parameters.sgdr_loss)
+                parameters['clf__alpha'] = hp.uniform('clf__alpha', self.flags_parameters.nb_alpha_min,
+                                                      self.flags_parameters.nb_alpha_max)
         else:
-            # parameters['clf__alpha'] = loguniform(self.flags_parameters.sgd_alpha_min,
-            #                                           self.flags_parameters.sgd_alpha_max)
-            # parameters['clf__penalty'] = self.flags_parameters.sgd_penalty  # ['l2', 'l1' ,'elasticnet']
-            # parameters['clf__loss'] = self.flags_parameters.sgd_loss
-            if self.flags_parameters.sgd_alpha_min == self.flags_parameters.sgd_alpha_max:
-                parameters['clf__alpha'] = hp.choice('clf__alpha', [self.flags_parameters.sgd_alpha_min])
+            # parameters['clf__alpha'] = uniform(self.flags_parameters.nb_alpha_min, self.flags_parameters.nb_alpha_max)
+            if self.flags_parameters.nb_alpha_min == self.flags_parameters.nb_alpha_max:
+                parameters['clf__alpha'] = hp.choice('clf__alpha', [self.flags_parameters.nb_alpha_min])
             else:
-                parameters['clf__alpha'] = hp.loguniform('clf__alpha', np.log(self.flags_parameters.sgd_alpha_min),
-                                                         np.log(self.flags_parameters.sgd_alpha_max))
-            parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.sgdr_penalty)
-            parameters['clf__loss'] = hp.choice('clf__loss', self.flags_parameters.sgdr_loss)
+                parameters['clf__alpha'] = hp.uniform('clf__alpha', self.flags_parameters.nb_alpha_min,
+                                                      self.flags_parameters.nb_alpha_max)
 
         if self.embedding.name_model in ['tf', 'tf-idf']:
             parameters_embedding = self.embedding.hyper_params()
@@ -97,11 +86,10 @@ class SGD_Regressor(Model):
         self.embedding.load_params(params_all, outdir)
 
     def model(self, hyper_params_clf={}):
-        clf = SGDRegressor(
-            random_state=self.seed,
-            early_stopping=True,
+        clf = MultinomialNB(
             **hyper_params_clf
         )
+
         if self.embedding.name_model in ['tf', 'tf-idf']:
             vect = self.embedding.model()
             pipeline = Pipeline(steps=[('vect', vect), ('clf', clf)])

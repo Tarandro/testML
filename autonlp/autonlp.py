@@ -27,20 +27,22 @@ from .features.embeddings.transformernlp import TransformerNLP
 from .utils.extraction_words import extract_influent_word, get_top_influent_word
 from .utils.metrics import build_df_confusion_matrix
 
-from .models.classifier.naive_bayes import Naive_Bayes
-from .models.classifier.logistic_regression import Logistic_Regression
-from .models.classifier.sgd_classifier import SGD_Classifier
-from .models.classifier.sgd_regressor import SGD_Regressor
-from .models.classifier.global_average import Global_Average
-from .models.classifier.attention import Attention
-from .models.classifier.birnn import Birnn
-from .models.classifier.birnn_attention import Birnn_Attention
-from .models.classifier.bilstm import Bilstm
-from .models.classifier.bilstm_attention import Bilstm_Attention
-from .models.classifier.bigru import Bigru
-from .models.classifier.bigru_attention import Bigru_Attention
-from .models.classifier.xgboost_tree import XGBoost
-from .models.classifier.blend_models import BlendModel
+from .models.classifier_nlp.naive_bayes import Naive_Bayes
+from .models.classifier_nlp.logistic_regression import Logistic_Regression
+from .models.classifier_nlp.sgd_classifier import SGD_Classifier
+from .models.classifier_nlp.sgd_regressor import SGD_Regressor
+from .models.classifier_nlp.global_average import Global_Average
+from .models.classifier_nlp.attention import Attention
+from .models.classifier_nlp.birnn import Birnn
+from .models.classifier_nlp.birnn_attention import Birnn_Attention
+from .models.classifier_nlp.bilstm import Bilstm
+from .models.classifier_nlp.bilstm_attention import Bilstm_Attention
+from .models.classifier_nlp.bigru import Bigru
+from .models.classifier_nlp.bigru_attention import Bigru_Attention
+from .models.classifier_nlp.xgboost_tree import XGBoost
+from .models.classifier_nlp.blend_models import BlendModel
+
+from .models.classifier.logistic_regression import ML_Logistic_Regression
 
 from .models.embeddings.trainer import Embedding
 
@@ -475,6 +477,11 @@ class AutoNLP:
         else:
             self.scaler_info = None
 
+        self.apply_autonlp = False
+        if self.column_text is not None:
+            if len(self.X_train.columns) == 1:
+                self.apply_autonlp = True
+
     def preprocess_test_data(self, data_test):
         """ Apply same transformation as in the function self.data_preprocessing for data_test
         Args:
@@ -519,6 +526,11 @@ class AutoNLP:
             data_test = self.transform_normalize_data(data_test)
         else:
             self.scaler_info = None
+
+        self.apply_autonlp = False
+        if self.column_text is not None:
+            if len(data_test.columns) == 1:
+                self.apply_autonlp = True
 
         if y_test is None:
             return data_test, doc_spacy_data_test
@@ -565,102 +577,111 @@ class AutoNLP:
         self.name_models = []
         self.name_classifiers = []
         self.class_embeddings = []
-        for name_model in self.include_model:
-            name_split = name_model.split("+")
 
-            # TF or TF-IDF embeddings :
-            if name_split[0].lower() in ['tf-idf', 'tf']:
-                if 'spacy' not in self.method_embedding.keys() or self.method_embedding[
-                    'spacy'] == [] or not self.flags_parameters.apply_spacy_preprocessing:
-                    if len(name_split) > 1:
-                        self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))
-                    self.name_models.append(name_model)
-                    if name_split[0].lower() == 'tf-idf':
-                        self.class_embeddings.append(Tfidf)
-                    else:
-                        self.class_embeddings.append(Tf_embedding)
-                    self.method_embedding[name_model] = ('all', False)
-                else:
-                    for (keep_pos_tag, lemmatize) in self.method_embedding['spacy']:
+        # if exist column text : need name model in embedding+classifier_nlp format
+        if self.apply_autonlp:
+            for name_model in self.include_model:
+                name_split = name_model.split("+")
+
+                # TF or TF-IDF embeddings :
+                if name_split[0].lower() in ['tf-idf', 'tf']:
+                    if 'spacy' not in self.method_embedding.keys() or self.method_embedding[
+                        'spacy'] == [] or not self.flags_parameters.apply_spacy_preprocessing:
                         if len(name_split) > 1:
                             self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))
-                        if keep_pos_tag == 'all':
-                            if lemmatize == True:
-                                self.name_models.append(name_model + '_lem')
-                                self.method_embedding[name_model + '_lem'] = (keep_pos_tag, lemmatize)
-                            else:
-                                self.name_models.append(name_model)
-                                self.method_embedding[name_model] = (keep_pos_tag, lemmatize)
-
-                        else:
-                            if lemmatize == True:
-                                self.name_models.append(name_model + '_' + "_".join(keep_pos_tag) + '_lem')
-                                self.method_embedding[name_model + '_' + "_".join(keep_pos_tag) + '_lem'] = (
-                                    keep_pos_tag, lemmatize)
-                            else:
-                                self.name_models.append(name_model + '_' + "_".join(keep_pos_tag))
-                                self.method_embedding[name_model + '_' + "_".join(keep_pos_tag)] = (
-                                    keep_pos_tag, lemmatize)
+                        self.name_models.append(name_model)
                         if name_split[0].lower() == 'tf-idf':
                             self.class_embeddings.append(Tfidf)
                         else:
                             self.class_embeddings.append(Tf_embedding)
+                        self.method_embedding[name_model] = ('all', False)
+                    else:
+                        for (keep_pos_tag, lemmatize) in self.method_embedding['spacy']:
+                            if len(name_split) > 1:
+                                self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))
+                            if keep_pos_tag == 'all':
+                                if lemmatize == True:
+                                    self.name_models.append(name_model + '_lem')
+                                    self.method_embedding[name_model + '_lem'] = (keep_pos_tag, lemmatize)
+                                else:
+                                    self.name_models.append(name_model)
+                                    self.method_embedding[name_model] = (keep_pos_tag, lemmatize)
 
-            # Word2Vec embeddings :
-            elif name_split[0].lower() in ['word2vec']:
-                if len(name_split) > 1:
-                    self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))  # remove digit
-                if 'word2vec' in self.method_embedding.keys():
-                    self.name_models.append(name_model)
-                    self.class_embeddings.append(Word2Vec)
-                    self.method_embedding[name_model] = self.method_embedding['word2vec']
+                            else:
+                                if lemmatize == True:
+                                    self.name_models.append(name_model + '_' + "_".join(keep_pos_tag) + '_lem')
+                                    self.method_embedding[name_model + '_' + "_".join(keep_pos_tag) + '_lem'] = (
+                                        keep_pos_tag, lemmatize)
+                                else:
+                                    self.name_models.append(name_model + '_' + "_".join(keep_pos_tag))
+                                    self.method_embedding[name_model + '_' + "_".join(keep_pos_tag)] = (
+                                        keep_pos_tag, lemmatize)
+                            if name_split[0].lower() == 'tf-idf':
+                                self.class_embeddings.append(Tfidf)
+                            else:
+                                self.class_embeddings.append(Tf_embedding)
+
+                # Word2Vec embeddings :
+                elif name_split[0].lower() in ['word2vec']:
+                    if len(name_split) > 1:
+                        self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))  # remove digit
+                    if 'word2vec' in self.method_embedding.keys():
+                        self.name_models.append(name_model)
+                        self.class_embeddings.append(Word2Vec)
+                        self.method_embedding[name_model] = self.method_embedding['word2vec']
+                    else:
+                        logger.warning(
+                            "\nInfo : Pre-training weight is not provided in method_embedding, continue without {}".format(
+                                name_model))
+
+                # FastText embeddings :
+                elif name_split[0].lower() in ['fasttext']:
+                    if len(name_split) > 1:
+                        self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))  # remove digit
+                    if 'fasttext' in self.method_embedding.keys():
+                        self.name_models.append(name_model)
+                        self.class_embeddings.append(Fasttext)
+                        self.method_embedding[name_model] = self.method_embedding['fasttext']
+                    else:
+                        logger.warning(
+                            "\nInfo : Pre-training weight is not provided in method_embedding, continue without {}".format(
+                                name_model))
+
+                # Doc2Vec embeddings :
+                elif name_split[0].lower() in ['doc2vec']:
+                    if len(name_split) > 1:
+                        self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))  # remove digit
+                    if 'doc2vec' in self.method_embedding.keys():
+                        self.name_models.append(name_model)
+                        self.class_embeddings.append(Doc2Vec)
+                        self.method_embedding[name_model] = self.method_embedding['doc2vec']
+                    else:
+                        logger.warning(
+                            "\nInfo : Pre-training weight is not provided in method_embedding, continue without {}".format(
+                                name_model))
+
+                # Transformer embeddings :
+                elif name_split[0].lower() in ['transformer']:
+                    if len(name_split) > 1:
+                        self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))
+                    if 'transformer' in self.method_embedding.keys():
+                        name_model = self.method_embedding['transformer'] + "+" + name_split[1]
+                        self.name_models.append(name_model)
+                        self.class_embeddings.append(TransformerNLP)
+                        self.method_embedding[name_model] = self.method_embedding['transformer']
+                    else:
+                        logger.warning(
+                            "\nInfo : Name of Transformer model is not provided in method_embedding, continue without {}".format(
+                                name_model))
+
                 else:
-                    logger.warning(
-                        "\nInfo : Pre-training weight is not provided in method_embedding, continue without {}".format(
-                            name_model))
+                    logger.warning("\nInfo : Unknown Name of the embedding method, continue without {}".format(name_model))
 
-            # FastText embeddings :
-            elif name_split[0].lower() in ['fasttext']:
-                if len(name_split) > 1:
-                    self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))  # remove digit
-                if 'fasttext' in self.method_embedding.keys():
-                    self.name_models.append(name_model)
-                    self.class_embeddings.append(Fasttext)
-                    self.method_embedding[name_model] = self.method_embedding['fasttext']
-                else:
-                    logger.warning(
-                        "\nInfo : Pre-training weight is not provided in method_embedding, continue without {}".format(
-                            name_model))
-
-            # Doc2Vec embeddings :
-            elif name_split[0].lower() in ['doc2vec']:
-                if len(name_split) > 1:
-                    self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))  # remove digit
-                if 'doc2vec' in self.method_embedding.keys():
-                    self.name_models.append(name_model)
-                    self.class_embeddings.append(Doc2Vec)
-                    self.method_embedding[name_model] = self.method_embedding['doc2vec']
-                else:
-                    logger.warning(
-                        "\nInfo : Pre-training weight is not provided in method_embedding, continue without {}".format(
-                            name_model))
-
-            # Transformer embeddings :
-            elif name_split[0].lower() in ['transformer']:
-                if len(name_split) > 1:
-                    self.name_classifiers.append(''.join([i for i in name_split[1] if not i.isdigit()]))
-                if 'transformer' in self.method_embedding.keys():
-                    name_model = self.method_embedding['transformer'] + "+" + name_split[1]
-                    self.name_models.append(name_model)
-                    self.class_embeddings.append(TransformerNLP)
-                    self.method_embedding[name_model] = self.method_embedding['transformer']
-                else:
-                    logger.warning(
-                        "\nInfo : Name of Transformer model is not provided in method_embedding, continue without {}".format(
-                            name_model))
-
-            else:
-                logger.warning("\nInfo : Unknown Name of the embedding method, continue without {}".format(name_model))
+        # if not exist column text : need name model in classifier_nlp format
+        else:
+            for name_model in self.include_model:
+                self.name_models.append(name_model)
+                self.name_classifiers.append(''.join([i for i in name_model if not i.isdigit()]))  # remove digit
 
     def train(self, x=None, y=None, x_val=None, y_val=None):
         """ Compute each NLP model :
@@ -717,12 +738,16 @@ class AutoNLP:
             # Create a 'best_logs' directory if not exist
             os.makedirs(os.path.join(self.flags_parameters.outdir, 'best_logs'), exist_ok=True)
 
-        dict_classifiers = {'naive_bayes': Naive_Bayes, 'logistic_regression': Logistic_Regression, 'sgd_classifier': SGD_Classifier,
-                            'sgd_regressor': SGD_Regressor, 'xgboost': XGBoost, 'global_average': Global_Average,
-                            'attention': Attention, 'birnn': Birnn, 'birnn_attention': Birnn_Attention,
-                            'bilstm': Bilstm, 'bilstm_attention': Bilstm_Attention, 'bigru': Bigru,
-                            'bigru_attention': Bigru_Attention}
-        class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
+        if self.apply_autonlp:
+            dict_classifiers = {'naive_bayes': Naive_Bayes, 'logistic_regression': Logistic_Regression, 'sgd_classifier': SGD_Classifier,
+                                'sgd_regressor': SGD_Regressor, 'xgboost': XGBoost, 'global_average': Global_Average,
+                                'attention': Attention, 'birnn': Birnn, 'birnn_attention': Birnn_Attention,
+                                'bilstm': Bilstm, 'bilstm_attention': Bilstm_Attention, 'bigru': Bigru,
+                                'bigru_attention': Bigru_Attention}
+            class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
+        else:
+            dict_classifiers = {'logistic_regression': ML_Logistic_Regression}
+            class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
 
         # Compute each NLP model :
         for i, name_model in enumerate(self.name_models):
@@ -731,13 +756,25 @@ class AutoNLP:
             #####################
             # MODELS AUTONLP :
             #####################
-            self.models[name_model] = class_models[i](self.flags_parameters, self.class_embeddings[i],
-                                                      name_model, self.column_text, self.class_weight)
+            if self.apply_autonlp:
 
-            self.models[name_model].autonlp(self.x_train, self.y_train, self.x_val, self.y_val,
-                                            self.apply_optimization, self.apply_validation,
-                                            self.method_embedding[name_model],
-                                            self.doc_spacy_data_train, self.doc_spacy_data_val)
+                self.models[name_model] = class_models[i](self.flags_parameters, self.class_embeddings[i],
+                                                          name_model, self.column_text, self.class_weight)
+
+                self.models[name_model].autonlp(self.x_train, self.y_train, self.x_val, self.y_val,
+                                                self.apply_optimization, self.apply_validation,
+                                                self.method_embedding[name_model],
+                                                self.doc_spacy_data_train, self.doc_spacy_data_val)
+            #####################
+            # MODELS AUTOML :
+            #####################
+            else:
+
+                self.models[name_model] = class_models[i](self.flags_parameters, name_model, self.class_weight)
+
+                self.models[name_model].automl(self.x_train, self.y_train, self.x_val, self.y_val,
+                                               self.apply_optimization, self.apply_validation)
+
             #####################
 
             # The following code consists to update and save best Hyperparameters / best models /
@@ -749,13 +786,19 @@ class AutoNLP:
             # else apply saving
             actual_best_cv_score = self.models[name_model].best_cv_score
             if self.apply_logs:
-                dir_best_logs_embedding = os.path.join(self.flags_parameters.outdir, 'best_logs',
-                                                       self.models[name_model].embedding.name_model)
-                os.makedirs(dir_best_logs_embedding, exist_ok=True)
-                if self.models[name_model].embedding.name_model == "transformer":
-                    dir_best_logs_model = os.path.join(dir_best_logs_embedding, name_model)
+
+                if self.apply_autonlp:
+                    dir_best_logs_embedding = os.path.join(self.flags_parameters.outdir, 'best_logs',
+                                                           self.models[name_model].embedding.name_model)
+                    os.makedirs(dir_best_logs_embedding, exist_ok=True)
+                    if self.models[name_model].embedding.name_model == "transformer":
+                        dir_best_logs_model = os.path.join(dir_best_logs_embedding, name_model)
+                    else:
+                        dir_best_logs_model = os.path.join(dir_best_logs_embedding, name_model.split('+')[1])
                 else:
-                    dir_best_logs_model = os.path.join(dir_best_logs_embedding, name_model.split('+')[1])
+                    dir_best_logs_model = os.path.join(self.flags_parameters.outdir, 'best_logs',
+                                                       self.models[name_model].name_classifier)
+
             if name_model in dict_models_parameters.keys():
                 latest_best_cv_score = dict_models_parameters[name_model]['best_cv_score']
                 if actual_best_cv_score > latest_best_cv_score:
@@ -1143,8 +1186,7 @@ class AutoNLP:
             y_shape1 = example_of_oof_val.shape[1]
             if apply_argmax and y_shape1 > 1:
                 dict_result = {name_model: np.argmax(self.models[name_model].info_scores['oof_val'], axis=1).reshape(-1)
-                               for
-                               name_model in self.models.keys()}
+                               for name_model in self.models.keys()}
 
                 result_val = pd.DataFrame(dict_result)
                 sns.set(rc={'figure.figsize': (10, 10)})
@@ -1229,33 +1271,38 @@ class AutoNLP:
                 name_model = list(params_all.keys())[0]
                 logger.info('\n\033[4m{} Model\033[0m:'.format(name_model))
                 params_all = params_all[name_model]
-                name_embedding = params_all["name_embedding"]
+                if self.apply_autonlp:
+                    name_embedding = params_all["name_embedding"]
             except:
                 logger.error("File 'parameters.json' in {} is not provided".format(self.outdir))
 
-        if name_embedding == 'tf':
-            class_embedding = Tf_embedding
-        elif name_embedding == 'tf-idf':
-            class_embedding = Tfidf
-        elif name_embedding == 'word2vec':
-            class_embedding = Word2Vec
-        elif name_embedding == 'fasttext':
-            class_embedding = Fasttext
-        elif name_embedding == 'doc2vec':
-            class_embedding = Doc2Vec
-        elif name_embedding == 'transformer':
-            class_embedding = TransformerNLP
-        else:
-            logger.error("\nInfo : Unknown Name of the embedding method : {}".format(name_model))
+        if self.apply_autonlp:
+            if name_embedding == 'tf':
+                class_embedding = Tf_embedding
+            elif name_embedding == 'tf-idf':
+                class_embedding = Tfidf
+            elif name_embedding == 'word2vec':
+                class_embedding = Word2Vec
+            elif name_embedding == 'fasttext':
+                class_embedding = Fasttext
+            elif name_embedding == 'doc2vec':
+                class_embedding = Doc2Vec
+            elif name_embedding == 'transformer':
+                class_embedding = TransformerNLP
+            else:
+                logger.error("\nInfo : Unknown Name of the embedding method : {}".format(name_model))
 
         try:
             if self.apply_logs:
                 outdir_name_logs = os.path.join(self.outdir, name_logs)
                 outdir_embedding = os.path.join(outdir_name_logs, name_embedding)
-                if name_embedding == "transformer":
-                    outdir_model = os.path.join(outdir_embedding, name_model)
+                if self.apply_autonlp:
+                    if name_embedding == "transformer":
+                        outdir_model = os.path.join(outdir_embedding, name_model)
+                    else:
+                        outdir_model = os.path.join(outdir_embedding, name_model.split('+')[1])
                 else:
-                    outdir_model = os.path.join(outdir_embedding, name_model.split('+')[1])
+                    outdir_model = os.path.join(outdir_embedding, name_model)
 
                 with open(os.path.join(outdir_model, "parameters.json")) as json_file:
                     params_all = json.load(json_file)
@@ -1284,18 +1331,25 @@ class AutoNLP:
             if self.apply_mlflow:
                 logger.error("MLflow Run experiment with name {} is not provided".format(name_model))
 
-
-        dict_classifiers = {'naive_bayes': Naive_Bayes, 'logistic_regression': Logistic_Regression,
-                            'sgd_classifier': SGD_Classifier,
-                            'sgd_regressor': SGD_Regressor, 'xgboost': XGBoost, 'global_average': Global_Average,
-                            'attention': Attention, 'birnn': Birnn, 'birnn_attention': Birnn_Attention,
-                            'bilstm': Bilstm, 'bilstm_attention': Bilstm_Attention, 'bigru': Bigru,
-                            'bigru_attention': Bigru_Attention}
-        name_classifier = params_all["name_classifier"]
-        class_model = dict_classifiers[name_classifier.lower()]
+        if self.apply_autonlp:
+            dict_classifiers = {'naive_bayes': Naive_Bayes, 'logistic_regression': Logistic_Regression,
+                                'sgd_classifier': SGD_Classifier,
+                                'sgd_regressor': SGD_Regressor, 'xgboost': XGBoost, 'global_average': Global_Average,
+                                'attention': Attention, 'birnn': Birnn, 'birnn_attention': Birnn_Attention,
+                                'bilstm': Bilstm, 'bilstm_attention': Bilstm_Attention, 'bigru': Bigru,
+                                'bigru_attention': Bigru_Attention}
+            name_classifier = params_all["name_classifier"]
+            class_model = dict_classifiers[name_classifier.lower()]
+        else:
+            dict_classifiers = {'logistic_regression': ML_Logistic_Regression}
+            name_classifier = params_all["name_classifier"]
+            class_model = dict_classifiers[name_classifier.lower()]
 
         # load flags ?
-        model_nlp = class_model(self.flags_parameters, class_embedding, name_model, self.column_text)
+        if self.apply_autonlp:
+            model_ml = class_model(self.flags_parameters, class_embedding, name_model, self.column_text)
+        else:
+            model_ml = class_model(self.flags_parameters, name_model)
 
         if self.apply_logs:
             outdir = self.outdir
@@ -1303,7 +1357,7 @@ class AutoNLP:
             outdir = os.path.join(self.path_mlflow, self.experiment_id)
         elif self.apply_app:
             outdir = self.outdir
-        model_nlp.load_params(params_all, outdir)
+        model_ml.load_params(params_all, outdir)
 
         if self.apply_app:
             outdir_model = self.outdir
@@ -1315,18 +1369,18 @@ class AutoNLP:
                     "Didn't find checkpoint model for {} in '{}'".format(name_model, outdir_model))
             loaded_models = []
             for path in model_paths:
-                model = model_nlp.model()
-                if model_nlp.is_NN:
+                model = model_ml.model()
+                if model_ml.is_NN:
                     model.load_weights(path)
                 else:
                     model = load(path)
                 loaded_models.append(model)
 
-            return model_nlp, loaded_models
+            return model_ml, loaded_models
 
-        return model_nlp
+        return model_ml
 
-    def single_prediction(self, name_embedding=None, name_model=None, model_nlp=None, loaded_models=None,
+    def single_prediction(self, name_embedding=None, name_model=None, model_ml=None, loaded_models=None,
                           name_logs='last_logs', on_test_data=True, x=None, y=None, doc_spacy_data_test=None,
                           return_model=False, return_scores=False, proba=True):
         """ Prediction on x or X_test (if on_test_data=True or x == None) for best name_model model
@@ -1374,15 +1428,15 @@ class AutoNLP:
 
         else:
 
-            if model_nlp is None:
+            if model_ml is None:
                 if self.apply_app:
-                    model_nlp, loaded_models = self.create_model_class(name_embedding, name_model, name_logs)
+                    model_ml, loaded_models = self.create_model_class(name_embedding, name_model, name_logs)
                 else:
-                    model_nlp = self.create_model_class(name_embedding, name_model, name_logs)
+                    model_ml = self.create_model_class(name_embedding, name_model, name_logs)
 
-            model_nlp.prediction(x, y, doc_spacy_data_test, name_logs, loaded_models)
+            model_ml.prediction(x, y, doc_spacy_data_test, name_logs, loaded_models)
 
-            prediction = model_nlp.info_scores['prediction']
+            prediction = model_ml.info_scores['prediction']
             if not proba and 'regression' not in self.objective:
                 if 'binary' not in self.objective:   #y.shape[1] == 1
                     confidence = np.max(prediction, axis=1).reshape(-1)
@@ -1394,7 +1448,7 @@ class AutoNLP:
 
             if not return_scores:
                 if return_model:
-                    return prediction, model_nlp
+                    return prediction, model_ml
                 else:
                     return prediction
             else:
@@ -1410,10 +1464,10 @@ class AutoNLP:
                     elif 'regression' in self.objective:
                         metrics = ['mse', 'rmse', 'explained_variance', 'r2']
 
-                    scores = {metric: model_nlp.info_scores[metric + '_' + 'test'] for metric in metrics}
+                    scores = {metric: model_ml.info_scores[metric + '_' + 'test'] for metric in metrics}
 
                 if return_model:
-                    return prediction, model_nlp, scores
+                    return prediction, model_ml, scores
                 else:
                     return prediction, scores
 
@@ -1438,7 +1492,7 @@ class AutoNLP:
                     logger.info('\n\033[4m{} Model\033[0m:'.format(name_model))
                     self.models[name_model].prediction(self.models, x, y)
                 else:
-                    name_embedding = self.models[name_model].embedding.name_model
+                    name_embedding = self.models[name_model].name_classifier
                     _ = self.single_prediction(name_embedding, name_model, name_logs=name_logs,
                                                on_test_data=on_test_data, x=x,
                                                y=y, doc_spacy_data_test=doc_spacy_data_test)
@@ -1471,13 +1525,15 @@ class AutoNLP:
                         file = open(os.path.join(path_mlflow_experiment_id, dir_run, "tags", "mlflow.runName"), 'r')
                         name_model = file.readlines()
                         list_name_models.append(name_model)
-                        file = open(os.path.join(path_mlflow_experiment_id, dir_run, "tags", "name_embedding"), 'r')
-                        name_embedding = file.readlines()
-                        list_name_embeddings.append(name_embedding)
+                        if self.apply_autonlp:
+                            file = open(os.path.join(path_mlflow_experiment_id, dir_run, "tags", "name_embedding"), 'r')
+                            name_embedding = file.readlines()
+                            list_name_embeddings.append(name_embedding)
 
             else:
                 outdir_name_logs = os.path.join(self.outdir, name_logs)
                 # possible_embeddings = ['tf', 'tf-idf', 'fasttext', 'word2vec', 'doc2vec', 'transformer']
+
                 try:
                     name_embeddings = [name_embedding for name_embedding in os.listdir(outdir_name_logs) if
                                        os.path.isdir(os.path.join(outdir_name_logs, name_embedding))]
@@ -1492,11 +1548,14 @@ class AutoNLP:
                     name_models_p = [name_model for name_model in os.listdir(outdir_embedding) if
                                      os.path.isdir(os.path.join(outdir_embedding, name_model))]
                     name_models = []
-                    for name_model in name_models_p:
-                        if "+" not in name_model:
-                            name_models.append(name_embedding + "+" + name_model)
-                        else:
-                            name_models.append(name_model)
+                    if self.apply_autonlp:
+                        for name_model in name_models_p:
+                            if "+" not in name_model:
+                                name_models.append(name_embedding + "+" + name_model)
+                            else:
+                                name_models.append(name_model)
+                    else:
+                        name_models = name_models_p
                     list_name_models.extend(name_models)
                     list_name_embeddings.extend([name_embedding for i in range(len(name_models))])
 
@@ -1536,7 +1595,7 @@ class AutoNLP:
                     if 'regression' not in self.objective:
                         if 'binary' in self.objective:
                             dict_prediction[name_model] = np.where(
-                                self.models[name_model].info_scores['prediction'] > 0.5, 1, 0)
+                                self.models[name_model].info_scores['prediction'] > 0.5, 1, 0).reshape(-1)
                         else:
                             dict_prediction[name_model] = np.argmax(self.models[name_model].info_scores['prediction'],
                                                                     axis=1).reshape(-1)
@@ -1547,12 +1606,13 @@ class AutoNLP:
                     if 'regression' not in self.objective:
                         if 'binary' in self.objective:
                             dict_prediction[name_model] = np.where(
-                                self.info_models[name_model].info_scores['prediction'] > 0.5, 1, 0)
+                                self.info_models[name_model].info_scores['prediction'] > 0.5, 1, 0).reshape(-1)
                         else:
                             dict_prediction[name_model] = np.argmax(
                                 self.info_models[name_model].info_scores['prediction'], axis=1).reshape(-1)
                     else:
                         dict_prediction[name_model] = self.info_models[name_model].info_scores['prediction']
+            print(dict_prediction)
             self.dataframe_predictions = pd.DataFrame(dict_prediction)
 
     def get_test_prediction(self, name_model):
@@ -1597,45 +1657,46 @@ class AutoNLP:
             copyfile(os.path.join(self.outdir, "flags.yaml"), os.path.join("./model_deployment", "flags.yaml"))
 
             # copy/deploy tokenizer.pickle
-            name_classifier = params_all_model["name_classifier"]
-            name_embedding = params_all_model["name_embedding"]
-            method_embedding = params_all_model["method_embedding"]
-            if name_classifier.lower() in ['global_average', 'attention', 'birnn', 'birnn_attention', 'bilstm',
-                                           'bilstm_attention', 'bigru', 'bigru_attention']:
-                # For these classifier models, it need an embedding of words :
-                dimension_embedding = 'word_embedding'
-                if name_embedding in ['tf', 'tf-idf']:
-                    keep_pos_tag, lemmatize = method_embedding[0], method_embedding[1]
-                    if keep_pos_tag == 'all':
-                        if lemmatize == True:
-                            tokenizer_name = 'tokenizer_lem'
+            if self.apply_autonlp:
+                name_classifier = params_all_model["name_classifier"]
+                name_embedding = params_all_model["name_embedding"]
+                method_embedding = params_all_model["method_embedding"]
+                if name_classifier.lower() in ['global_average', 'attention', 'birnn', 'birnn_attention', 'bilstm',
+                                               'bilstm_attention', 'bigru', 'bigru_attention']:
+                    # For these classifier_nlp models, it need an embedding of words :
+                    dimension_embedding = 'word_embedding'
+                    if name_embedding in ['tf', 'tf-idf']:
+                        keep_pos_tag, lemmatize = method_embedding[0], method_embedding[1]
+                        if keep_pos_tag == 'all':
+                            if lemmatize == True:
+                                tokenizer_name = 'tokenizer_lem'
+                            else:
+                                tokenizer_name = 'tokenizer_ALL'
                         else:
-                            tokenizer_name = 'tokenizer_ALL'
-                    else:
-                        if lemmatize == True:
-                            tokenizer_name = 'tokenizer' + '_' + "_".join(keep_pos_tag) + '_lem'
-                        else:
-                            tokenizer_name = 'tokenizer' + '_' + "_".join(keep_pos_tag)
-                    copyfile(os.path.join(self.outdir, tokenizer_name + '.pickle'),
-                             os.path.join("./model_deployment", tokenizer_name + '.pickle'))
-                elif name_embedding == 'transformer':
-                    pass
-                elif name_embedding in ['word2vec', 'fasttext', 'doc2vec']:
-                    copyfile(os.path.join(self.outdir, 'tokenizer.pickle'),
-                             os.path.join("./model_deployment", 'tokenizer.pickle'))
-            else:
-                dimension_embedding = 'doc_embedding'
+                            if lemmatize == True:
+                                tokenizer_name = 'tokenizer' + '_' + "_".join(keep_pos_tag) + '_lem'
+                            else:
+                                tokenizer_name = 'tokenizer' + '_' + "_".join(keep_pos_tag)
+                        copyfile(os.path.join(self.outdir, tokenizer_name + '.pickle'),
+                                 os.path.join("./model_deployment", tokenizer_name + '.pickle'))
+                    elif name_embedding == 'transformer':
+                        pass
+                    elif name_embedding in ['word2vec', 'fasttext', 'doc2vec']:
+                        copyfile(os.path.join(self.outdir, 'tokenizer.pickle'),
+                                 os.path.join("./model_deployment", 'tokenizer.pickle'))
+                else:
+                    dimension_embedding = 'doc_embedding'
 
-            if name_embedding in ['word2vec', 'fasttext', 'doc2vec']:
-                found_dir = False
-                for name_directory in ['Word2Vec', 'FastText', 'Doc2Vec']:
-                    if os.path.samefile(os.path.dirname(method_embedding), os.path.join(self.outdir, name_directory)):
-                        copytree(os.path.join(self.outdir, name_directory),
-                                 os.path.join("./model_deployment", name_directory))
-                        found_dir = True
-                        break
-                if not found_dir:
-                    copyfile(method_embedding)
+                if name_embedding in ['word2vec', 'fasttext', 'doc2vec']:
+                    found_dir = False
+                    for name_directory in ['Word2Vec', 'FastText', 'Doc2Vec']:
+                        if os.path.samefile(os.path.dirname(method_embedding), os.path.join(self.outdir, name_directory)):
+                            copytree(os.path.join(self.outdir, name_directory),
+                                     os.path.join("./model_deployment", name_directory))
+                            found_dir = True
+                            break
+                    if not found_dir:
+                        copyfile(method_embedding)
 
 
     def extraction(self, name_embedding=None, name_model=None, model_nlp=None, loaded_models=None,

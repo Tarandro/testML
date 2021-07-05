@@ -1,5 +1,5 @@
-from ...models.classifier.trainer import Model
-from tensorflow.keras.layers import GRU, Dropout
+from ...models.classifier_nlp.trainer import Model
+from tensorflow.keras.layers import SimpleRNN, Dropout
 from tensorflow.keras.layers import Bidirectional
 import numpy as np
 import tensorflow as tf
@@ -8,11 +8,9 @@ from tensorflow.keras.layers import Dense
 import os
 import json
 
-from ...models.classifier.attention import Attention_layer
 
-
-class Bigru_Attention(Model):
-    name_classifier = 'Bigru_Attention'
+class Birnn(Model):
+    name_classifier = 'Birnn'
     dimension_embedding = "word_embedding"
     is_NN = True
 
@@ -25,31 +23,30 @@ class Bigru_Attention(Model):
 
     def hyper_params(self, size_params='small'):
         # Default : parameters = {'hidden_unit': hp.randint('hidden_unit_1', 120, 130),
-        #                         'learning_rate': hp.choice('learning_rate', [1e-2, 1e-3]),
         #                         'dropout_rate': hp.uniform('dropout_rate', 0, 0.5)}
         parameters = dict()
         if size_params == 'small':
-            if self.flags_parameters.gru_hidden_unit_min == self.flags_parameters.gru_hidden_unit_max:
-                parameters['hidden_unit'] = hp.choice('hidden_unit_1', [self.flags_parameters.gru_hidden_unit_min])
+            if self.flags_parameters.rnn_hidden_unit_min == self.flags_parameters.rnn_hidden_unit_max:
+                parameters['hidden_unit'] = hp.choice('hidden_unit_1', [self.flags_parameters.rnn_hidden_unit_min])
             else:
-                parameters['hidden_unit'] = hp.randint('hidden_unit_1', self.flags_parameters.gru_hidden_unit_min,
-                                                       self.flags_parameters.gru_hidden_unit_max)
-            if self.flags_parameters.gru_dropout_rate_min == self.flags_parameters.gru_dropout_rate_max:
-                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.gru_dropout_rate_min])
+                parameters['hidden_unit'] = hp.randint('hidden_unit_1', self.flags_parameters.rnn_hidden_unit_min,
+                                                       self.flags_parameters.rnn_hidden_unit_max)
+            if self.flags_parameters.rnn_dropout_rate_min == self.flags_parameters.rnn_dropout_rate_max:
+                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.rnn_dropout_rate_min])
             else:
-                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.gru_dropout_rate_min,
-                                                        self.flags_parameters.gru_dropout_rate_max)
+                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.rnn_dropout_rate_min,
+                                                        self.flags_parameters.rnn_dropout_rate_max)
         else:
-            if self.flags_parameters.gru_hidden_unit_min == self.flags_parameters.gru_hidden_unit_max:
-                parameters['hidden_unit'] = hp.choice('hidden_unit_1', [self.flags_parameters.gru_hidden_unit_min])
+            if self.flags_parameters.rnn_hidden_unit_min == self.flags_parameters.rnn_hidden_unit_max:
+                parameters['hidden_unit'] = hp.choice('hidden_unit_1', [self.flags_parameters.rnn_hidden_unit_min])
             else:
-                parameters['hidden_unit'] = hp.randint('hidden_unit_1', self.flags_parameters.gru_hidden_unit_min,
-                                                       self.flags_parameters.gru_hidden_unit_max)
-            if self.flags_parameters.gru_dropout_rate_min == self.flags_parameters.gru_dropout_rate_max:
-                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.gru_dropout_rate_min])
+                parameters['hidden_unit'] = hp.randint('hidden_unit_1', self.flags_parameters.rnn_hidden_unit_min,
+                                                       self.flags_parameters.rnn_hidden_unit_max)
+            if self.flags_parameters.rnn_dropout_rate_min == self.flags_parameters.rnn_dropout_rate_max:
+                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.rnn_dropout_rate_min])
             else:
-                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.gru_dropout_rate_min,
-                                                        self.flags_parameters.gru_dropout_rate_max)
+                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.rnn_dropout_rate_min,
+                                                        self.flags_parameters.rnn_dropout_rate_max)
         parameters_embedding = self.embedding.hyper_params()
         parameters.update(parameters_embedding)
         return parameters
@@ -96,10 +93,9 @@ class Bigru_Attention(Model):
 
         x, inp = self.embedding.model()
 
-        x = Bidirectional(GRU(int(self.p['hidden_unit']), return_sequences=True))(x)
+        x = Bidirectional(SimpleRNN(int(self.p['hidden_unit']), return_sequences=False))(x)
         # x = Bidirectional(tf.keras.layers.LSTM(64, return_sequences=True))(x)
         x = Dropout(self.p['dropout_rate'])(x)
-        x = Attention_layer(self.embedding.maxlen)(x)
 
         if 'binary' in self.objective:
             out = Dense(1, 'sigmoid')(x)

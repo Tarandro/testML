@@ -1,4 +1,6 @@
-from ...models.classifier.trainer import Model
+from ...models.classifier_nlp.trainer import Model
+from tensorflow.keras.layers import GRU, Dropout
+from tensorflow.keras.layers import Bidirectional
 import numpy as np
 import tensorflow as tf
 from hyperopt import hp
@@ -6,9 +8,11 @@ from tensorflow.keras.layers import Dense
 import os
 import json
 
+from ...models.classifier_nlp.attention import Attention_layer
 
-class Global_Average(Model):
-    name_classifier = 'Global_Average'
+
+class Bigru_Attention(Model):
+    name_classifier = 'Bigru_Attention'
     dimension_embedding = "word_embedding"
     is_NN = True
 
@@ -20,21 +24,32 @@ class Global_Average(Model):
         self.min_lr = self.flags_parameters.min_lr
 
     def hyper_params(self, size_params='small'):
-        # Default : self.parameters = {'dropout_rate': hp.uniform('dropout_rate', 0, 0.5)}
+        # Default : parameters = {'hidden_unit': hp.randint('hidden_unit_1', 120, 130),
+        #                         'learning_rate': hp.choice('learning_rate', [1e-2, 1e-3]),
+        #                         'dropout_rate': hp.uniform('dropout_rate', 0, 0.5)}
         parameters = dict()
         if size_params == 'small':
-            if self.flags_parameters.ga_dropout_rate_min == self.flags_parameters.ga_dropout_rate_max:
-                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.ga_dropout_rate_min])
+            if self.flags_parameters.gru_hidden_unit_min == self.flags_parameters.gru_hidden_unit_max:
+                parameters['hidden_unit'] = hp.choice('hidden_unit_1', [self.flags_parameters.gru_hidden_unit_min])
             else:
-                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.ga_dropout_rate_min,
-                                                             self.flags_parameters.ga_dropout_rate_max)
+                parameters['hidden_unit'] = hp.randint('hidden_unit_1', self.flags_parameters.gru_hidden_unit_min,
+                                                       self.flags_parameters.gru_hidden_unit_max)
+            if self.flags_parameters.gru_dropout_rate_min == self.flags_parameters.gru_dropout_rate_max:
+                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.gru_dropout_rate_min])
+            else:
+                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.gru_dropout_rate_min,
+                                                        self.flags_parameters.gru_dropout_rate_max)
         else:
-            if self.flags_parameters.ga_dropout_rate_min == self.flags_parameters.ga_dropout_rate_max:
-                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.ga_dropout_rate_min])
+            if self.flags_parameters.gru_hidden_unit_min == self.flags_parameters.gru_hidden_unit_max:
+                parameters['hidden_unit'] = hp.choice('hidden_unit_1', [self.flags_parameters.gru_hidden_unit_min])
             else:
-                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.ga_dropout_rate_min,
-                                                        self.flags_parameters.ga_dropout_rate_max)
-
+                parameters['hidden_unit'] = hp.randint('hidden_unit_1', self.flags_parameters.gru_hidden_unit_min,
+                                                       self.flags_parameters.gru_hidden_unit_max)
+            if self.flags_parameters.gru_dropout_rate_min == self.flags_parameters.gru_dropout_rate_max:
+                parameters['dropout_rate'] = hp.choice('dropout_rate', [self.flags_parameters.gru_dropout_rate_min])
+            else:
+                parameters['dropout_rate'] = hp.uniform('dropout_rate', self.flags_parameters.gru_dropout_rate_min,
+                                                        self.flags_parameters.gru_dropout_rate_max)
         parameters_embedding = self.embedding.hyper_params()
         parameters.update(parameters_embedding)
         return parameters
@@ -81,8 +96,10 @@ class Global_Average(Model):
 
         x, inp = self.embedding.model()
 
-        x = tf.keras.layers.Dropout(self.p['dropout_rate'])(x)
-        x = tf.keras.layers.GlobalAveragePooling1D()(x)
+        x = Bidirectional(GRU(int(self.p['hidden_unit']), return_sequences=True))(x)
+        # x = Bidirectional(tf.keras.layers.LSTM(64, return_sequences=True))(x)
+        x = Dropout(self.p['dropout_rate'])(x)
+        x = Attention_layer(self.embedding.maxlen)(x)
 
         if 'binary' in self.objective:
             out = Dense(1, 'sigmoid')(x)

@@ -1,4 +1,4 @@
-from ...models.classifier.trainer import Model
+from ...models.classifier_nlp.trainer import Model
 from tensorflow.keras.layers import LSTM, Dropout
 from tensorflow.keras.layers import Bidirectional
 import numpy as np

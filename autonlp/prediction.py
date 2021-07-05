@@ -17,12 +17,12 @@ class Prediction:
 
     def __init__(self, objective, name_embedding=None, name_model_full=None, outdir="./", name_logs='last_logs',
                  is_NN=False, class_weight=None, apply_mlflow=False, experiment_name="Experiment", apply_logs=True,
-                 apply_app=False):
+                 apply_app=False, apply_autonlp=False):
         """
         Args:
             objective (str) : 'binary' or 'multi-class' or 'regression'
             name_embedding (str) : embedding name method
-            name_model_full (str) : full name of model (embedding+classifier+tag)
+            name_model_full (str) : full name of model (embedding+classifier_nlp+tag)
             outdir (str) path where model are saved
             name_logs ('best_logs' or 'last_logs')
             is_NN (Boolean) True if the model is a Neural Network
@@ -41,6 +41,7 @@ class Prediction:
         self.experiment_name = experiment_name
         self.apply_logs = apply_logs
         self.apply_app = apply_app
+        self.apply_autonlp = apply_autonlp
 
     def fit(self, model, x, y=None, loaded_models=None):
         """ Fit model on x with different model folds
@@ -54,11 +55,14 @@ class Prediction:
 
         # get path of models :
         if self.apply_logs:
-            if self.name_embedding.lower() == "transformer":
-                outdir_model = os.path.join(self.outdir, self.name_logs, self.name_embedding, self.name_model_full)
+            if self.apply_autonlp:
+                if self.name_embedding.lower() == "transformer":
+                    outdir_model = os.path.join(self.outdir, self.name_logs, self.name_embedding, self.name_model_full)
+                else:
+                    outdir_model = os.path.join(self.outdir, self.name_logs, self.name_embedding,
+                                                self.name_model_full.split('+')[1])
             else:
-                outdir_model = os.path.join(self.outdir, self.name_logs, self.name_embedding,
-                                            self.name_model_full.split('+')[1])
+                outdir_model = os.path.join(self.outdir, self.name_logs, self.name_embedding, self.name_model_full)
             # get path of model folds :
             try:
                 models_or_paths = glob(outdir_model + '/fold*')
