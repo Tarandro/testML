@@ -22,8 +22,8 @@ flags_dict_info = {
 
 flags_dict_autonlp = {
     "objective": 'binary',    # 'binary' or 'multi-class' or 'regression'
-    "include_model": ['Logistic_Regression', 'Logistic_Regression1'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
-    "max_run_time_per_model": 2,
+    "include_model": ['lightgbm', 'xgboost', 'catboost'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
+    "max_run_time_per_model": 60,
     "frac_trainset": 0.7,
     "scoring": 'f1',
     "nfolds": 5,

@@ -38,7 +38,7 @@ class Logistic_Regression(Model):
                 parameters['clf__C'] = hp.loguniform('clf__C', np.log(self.flags_parameters.logr_C_min),
                                                      np.log(self.flags_parameters.logr_C_max))
             parameters['clf__penalty'] = hp.choice('clf__penalty', self.flags_parameters.logr_penalty)
-            parameters['clf__max__iter'] = hp.uniform('clf__max__iter', 50, 150)
+            parameters['clf__max__iter'] = hp.randint('clf__max__iter', 50, 150)
 
         if self.embedding.name_model in ['tf', 'tf-idf']:
             parameters_embedding = self.embedding.hyper_params()

@@ -43,6 +43,10 @@ from .models.classifier_nlp.xgboost_tree import XGBoost
 from .models.classifier_nlp.blend_models import BlendModel
 
 from .models.classifier.logistic_regression import ML_Logistic_Regression
+from .models.classifier.randomforest_classifier import ML_RandomForest
+from .models.classifier.lightgbm import ML_LightGBM
+from .models.classifier.xgboost import ML_XGBoost
+from .models.classifier.catboost import ML_CatBoost
 
 from .models.embeddings.trainer import Embedding
 
@@ -746,7 +750,8 @@ class AutoNLP:
                                 'bigru_attention': Bigru_Attention}
             class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
         else:
-            dict_classifiers = {'logistic_regression': ML_Logistic_Regression}
+            dict_classifiers = {'logistic_regression': ML_Logistic_Regression, 'randomforest': ML_RandomForest,
+                                'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost}
             class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
 
         # Compute each NLP model :
@@ -1343,7 +1348,8 @@ class AutoNLP:
             name_classifier = params_all["name_classifier"]
             class_model = dict_classifiers[name_classifier.lower()]
         else:
-            dict_classifiers = {'logistic_regression': ML_Logistic_Regression}
+            dict_classifiers = {'logistic_regression': ML_Logistic_Regression, 'randomforest': ML_RandomForest,
+                                'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost}
             name_classifier = params_all["name_classifier"]
             class_model = dict_classifiers[name_classifier.lower()]
 

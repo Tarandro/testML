@@ -252,6 +252,26 @@ class Flags:
     sgdr_penalty: list = field(default_factory=lambda: ['l2', 'l1'])
     sgdr_loss: list = field(default_factory=lambda: ['squared_loss', 'huber', 'epsilon_insensitive'])
 
+    # Random Forest Classifier or Regressor
+    rf_n_estimators_min: int = 20
+    rf_n_estimators_max: int = 100
+    rf_max_depth_min: int = 5
+    rf_max_depth_max: int = 75
+    rf_min_samples_split_min: int = 5
+    rf_min_samples_split_max: int = 15
+    rf_max_samples_min: float = 0.5
+    rf_max_samples_max: float = 1
+
+    # LightBGM Classifier or Regressor
+    lgbm_n_estimators_min: int = 20
+    lgbm_n_estimators_max: int = 200
+    lgbm_num_leaves_min: int = 5
+    lgbm_num_leaves_max: int = 150
+    lgbm_learning_rate_min: float = 0.03
+    lgbm_learning_rate_max: float = 0.3
+    lgbm_bagging_fraction_min: float = 0.5
+    lgbm_bagging_fraction_max: float = 1
+
     # XGBoost
     xgb_n_estimators_min: int = 20
     xgb_n_estimators_max: int = 200
@@ -261,6 +281,16 @@ class Flags:
     xgb_learning_rate_max: float = 0.3
     xgb_subsample_min: float = 0.5
     xgb_subsample_max: float = 1.0
+
+    # CatBoost
+    cat_iterations_min: int = 20
+    cat_iterations_max: int = 200
+    cat_depth_min: int = 2
+    cat_depth_max: int = 9
+    cat_learning_rate_min: float = 0.04
+    cat_learning_rate_max: float = 0.3
+    cat_subsample_min: float = 0.5
+    cat_subsample_max: float = 1
 
     ### Classifier Neural Network
     # GlobalAverage

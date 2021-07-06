@@ -35,12 +35,14 @@ class ML_Logistic_Regression(Model):
                 parameters['C'] = hp.loguniform('C', np.log(self.flags_parameters.logr_C_min),
                                                      np.log(self.flags_parameters.logr_C_max))
             parameters['penalty'] = hp.choice('penalty', self.flags_parameters.logr_penalty)
-            parameters['max_iter'] = hp.uniform('max_iter', 50, 150)
+            parameters['max_iter'] = hp.randint('max_iter', 50, 150)
 
         return parameters
 
     def initialize_params(self, y, params):
         self.shape_y = y.shape[1]
+        if self.shape_y > 1:
+            params = {'estimator__'+k: v for k, v in params.items()}
         self.p = params
 
     def save_params(self, outdir_model):
