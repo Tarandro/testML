@@ -796,8 +796,10 @@ class AutoNLP:
                     else:
                         dir_best_logs_model = os.path.join(dir_best_logs_embedding, name_model.split('+')[1])
                 else:
-                    dir_best_logs_model = os.path.join(self.flags_parameters.outdir, 'best_logs',
+                    dir_best_logs_classifier = os.path.join(self.flags_parameters.outdir, 'best_logs',
                                                        self.models[name_model].name_classifier)
+                    os.makedirs(dir_best_logs_classifier, exist_ok=True)
+                    dir_best_logs_model = os.path.join(dir_best_logs_classifier, name_model)
 
             if name_model in dict_models_parameters.keys():
                 latest_best_cv_score = dict_models_parameters[name_model]['best_cv_score']
@@ -1612,7 +1614,7 @@ class AutoNLP:
                                 self.info_models[name_model].info_scores['prediction'], axis=1).reshape(-1)
                     else:
                         dict_prediction[name_model] = self.info_models[name_model].info_scores['prediction']
-            print(dict_prediction)
+
             self.dataframe_predictions = pd.DataFrame(dict_prediction)
 
     def get_test_prediction(self, name_model):

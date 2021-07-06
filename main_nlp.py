@@ -19,6 +19,30 @@ flags_dict_info = {
 
     "target": ["Exited"]
 }
+
+flags_dict_autonlp = {
+    "objective": 'binary',    # 'binary' or 'multi-class' or 'regression'
+    "include_model": ['Logistic_Regression', 'Logistic_Regression1'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
+    "max_run_time_per_model": 2,
+    "frac_trainset": 0.7,
+    "scoring": 'f1',
+    "nfolds": 5,
+    "nfolds_train": 1,
+    "class_weight": True,
+    "apply_blend_model": True,
+    "verbose": 2,
+    "method_embedding": {'Word2vec': 'Word2Vec',
+                         'Fasttext': 'FastText',
+                         'Doc2Vec': 'Doc2Vec',
+                         'Transformer': 'CamemBERT',
+                         'spacy': [('all', False), (['ADJ', 'NOUN', 'VERB', 'DET'], False)]},
+
+    "apply_optimization": True,
+    "apply_validation": True,
+    "path_models_parameters": None,
+    "path_models_best_parameters": None
+}
+
 flags_dict_ml_preprocessing = {
 
     "ordinal_features": [],  # "Geography"
@@ -68,29 +92,6 @@ flags_dict_nlp_preprocessing = {
     "name_spacy_model": "fr_core_news_md",  # en_core_web_md
     "apply_spacy_preprocessing": True,
     "apply_entity_preprocessing": True
-}
-
-flags_dict_autonlp = {
-    "objective": 'binary',    # 'binary' or 'multi-class' or 'regression'
-    "include_model": ['Logistic_Regression'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
-    "max_run_time_per_model": 10,
-    "frac_trainset": 0.7,
-    "scoring": 'f1',
-    "nfolds": 5,
-    "nfolds_train": 1,
-    "class_weight": True,
-    "apply_blend_model": True,
-    "verbose": 2,
-    "method_embedding": {'Word2vec': 'Word2Vec',
-                         'Fasttext': 'FastText',
-                         'Doc2Vec': 'Doc2Vec',
-                         'Transformer': 'CamemBERT',
-                         'spacy': [('all', False), (['ADJ', 'NOUN', 'VERB', 'DET'], False)]},
-
-    "apply_optimization": True,
-    "apply_validation": True,
-    "path_models_parameters": None,
-    "path_models_best_parameters": None
 }
 
 flags_dict_display = {

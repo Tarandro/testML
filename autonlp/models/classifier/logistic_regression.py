@@ -49,6 +49,7 @@ class ML_Logistic_Regression(Model):
         p_model = self.p.copy()
         params_all['p_model'] = p_model
         params_all['name_classifier'] = self.name_classifier
+        params_all['shape_y'] = self.shape_y
 
         self.params_all = {self.name_model_full: params_all}
 
@@ -59,6 +60,7 @@ class ML_Logistic_Regression(Model):
     def load_params(self, params_all, outdir):
         p_model = params_all['p_model']
         self.p = p_model
+        self.shape_y = params_all['shape_y']
 
     def model(self, hyper_params_clf={}):
         clf = LogisticRegression(

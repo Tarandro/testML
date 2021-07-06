@@ -150,7 +150,6 @@ class Model:
             max_trials = 1000
 
         # there are two different optimizations depending on whether the model is a NN or another models
-        print('NN', self.is_NN)
         if self.is_NN:
             self.optimiz = Optimiz_hyperopt_NN(self, self.hyper_params(self.flags_parameters.size_params),
                                                self.flags_parameters.apply_optimization)
@@ -239,7 +238,7 @@ class Model:
         # get path of models :
         has_saved_model = False
         if self.apply_logs:
-            outdir_model = os.path.join(self.flags_parameters.outdir, name_logs, self.name_classifier)
+            outdir_model = os.path.join(self.flags_parameters.outdir, name_logs, self.name_classifier, self.name_model_full)
             # get path of model folds :
             try:
                 model_fold_paths = glob(outdir_model + '/fold*')
