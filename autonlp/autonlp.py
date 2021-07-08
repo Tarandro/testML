@@ -47,6 +47,7 @@ from .models.classifier.randomforest_classifier import ML_RandomForest
 from .models.classifier.lightgbm import ML_LightGBM
 from .models.classifier.xgboost import ML_XGBoost
 from .models.classifier.catboost import ML_CatBoost
+from .models.classifier.dense_network import ML_DenseNetwork
 
 from .models.embeddings.trainer import Embedding
 
@@ -751,7 +752,8 @@ class AutoNLP:
             class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
         else:
             dict_classifiers = {'logistic_regression': ML_Logistic_Regression, 'randomforest': ML_RandomForest,
-                                'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost}
+                                'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost,
+                                'dense_network': ML_DenseNetwork}
             class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
 
         # Compute each NLP model :
@@ -775,7 +777,8 @@ class AutoNLP:
             #####################
             else:
 
-                self.models[name_model] = class_models[i](self.flags_parameters, name_model, self.class_weight)
+                self.models[name_model] = class_models[i](self.flags_parameters, name_model, self.class_weight,
+                                                          self.len_unique_value)
 
                 self.models[name_model].automl(self.x_train, self.y_train, self.x_val, self.y_val,
                                                self.apply_optimization, self.apply_validation)
@@ -1349,7 +1352,8 @@ class AutoNLP:
             class_model = dict_classifiers[name_classifier.lower()]
         else:
             dict_classifiers = {'logistic_regression': ML_Logistic_Regression, 'randomforest': ML_RandomForest,
-                                'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost}
+                                'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost,
+                                'dense_network': ML_DenseNetwork}
             name_classifier = params_all["name_classifier"]
             class_model = dict_classifiers[name_classifier.lower()]
 

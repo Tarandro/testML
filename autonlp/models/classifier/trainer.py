@@ -21,7 +21,7 @@ class Model:
             - prediction on test set for each fold of a model : function : prediction()
     """
 
-    def __init__(self, flags_parameters, name_model_full, class_weight=None):
+    def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={}):
         """
         Args:
             flags_parameters : Instance of Flags class object
@@ -47,6 +47,7 @@ class Model:
         self.apply_logs = flags_parameters.apply_logs
         self.apply_app = flags_parameters.apply_app
         self.seed = flags_parameters.seed
+        self.ordinal_features = flags_parameters.ordinal_features
         self.name_model = None
         self.name_model_full = name_model_full
         self.class_weight = class_weight
@@ -54,6 +55,7 @@ class Model:
         self.df_all_results = pd.DataFrame()
         self.info_scores = {}
         self.apply_autonlp = False
+        self.len_unique_value = len_unique_value
 
         if self.apply_mlflow:
             import mlflow
@@ -289,6 +291,20 @@ class Model:
             #        x_test = x_test_preprocessed
             #    else:
             #        x_test[x_test.columns[self.column_text]] = x_test_preprocessed
+            time_series_recursive = True
+            if 'time_series' in self.objective:
+                if self.name_classifier == 'LSTM':
+                    x_test, y_test = self.preprocessing_transform(x_test, y_test)
+                elif self.is_NN:
+                    x_test = self.preprocessing_transform(x_test)
+                    if time_series_recursive:
+                        x_train = x_test
+                        x_train = self.preprocessing_transform(x_train)
+                info_ts = None
+            else:
+                if self.is_NN:
+                    x_test = self.preprocessing_transform(x_test)
+                info_ts = None
 
             # use label map if labels are not numerics
             if y_test is not None:
@@ -409,6 +425,27 @@ class Model:
         #        x_train[x_train.columns[self.column_text]] = x_train_preprocessed
         #        if x_val is not None:
         #            x_val[x_val.columns[self.column_text]] = x_val_preprocessed
+
+        size_train_prc = 0.7
+        if self.is_NN:
+            if self.name_classifier == 'LSTM':
+                x_train, y_train = self.preprocessing_fit_transform(x_train, y_train, size_train_prc)
+                if x_val_before is not None:
+                    x_val = self.preprocessing_transform(x_val, y_val)
+
+            #elif self.name_classifier == 'DenseNetwork':
+            else:
+                x_train = self.preprocessing_fit_transform(x_train)
+                if x_val_before is not None:
+                    x_val = self.preprocessing_transform(x_val)
+
+        if 'time_series' in self.objective:
+            if self.name_classifier == 'LSTM':
+                size_train = self.size_y_train_preprocessed
+            else:
+                size_train = int(y_train.shape[0] * size_train_prc)
+        else:
+            size_train = None
 
         ###############
         # Optimization

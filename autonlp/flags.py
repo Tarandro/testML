@@ -292,6 +292,17 @@ class Flags:
     cat_subsample_min: float = 0.5
     cat_subsample_max: float = 1
 
+    # Dense Neural Network
+    dnn_hidden_unit_1_min: int = 60
+    dnn_hidden_unit_1_max: int = 120
+    dnn_hidden_unit_2_min: int = 60
+    dnn_hidden_unit_2_max: int = 120
+    dnn_hidden_unit_3_min: int = 60
+    dnn_hidden_unit_3_max: int = 120
+    dnn_learning_rate: list = field(default_factory=lambda: [1e-2, 1e-3])
+    dnn_dropout_rate_min: float = 0.0
+    dnn_dropout_rate_max: float = 0.5
+
     ### Classifier Neural Network
     # GlobalAverage
     ga_dropout_rate_min: float = 0

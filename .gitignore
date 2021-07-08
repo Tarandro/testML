@@ -4,3 +4,4 @@
 /mlruns/
 /data/
 /model_deployment/
+/catboost_info/

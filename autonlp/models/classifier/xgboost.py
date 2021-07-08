@@ -11,8 +11,8 @@ class ML_XGBoost(Model):
     name_classifier = 'XGBoost'
     is_NN = False
 
-    def __init__(self, flags_parameters, name_model_full, class_weight=None):
-        Model.__init__(self, flags_parameters, name_model_full, class_weight)
+    def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={}):
+        Model.__init__(self, flags_parameters, name_model_full, class_weight, len_unique_value)
 
     def hyper_params(self, size_params='small'):
         parameters = dict()
