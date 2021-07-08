@@ -5,6 +5,10 @@ import os
 import json
 import tensorflow as tf
 from tensorflow.keras.layers import Dense,concatenate, Flatten, Embedding
+import logging
+from ...utils.logging import get_logger, verbosity_to_loglevel
+
+logger = get_logger(__name__)
 
 
 class ML_DenseNetwork(Model):
@@ -78,7 +82,6 @@ class ML_DenseNetwork(Model):
         return parameters
 
     def preprocessing_fit_transform(self, x):
-        print("Preprocess time_series, shapes :")
         self.ordered_column = list(x.columns)
         self.name_numeric_features = [name for name in x.columns if name not in self.ordinal_features]
         self.shape_embedding = {}
@@ -95,8 +98,8 @@ class ML_DenseNetwork(Model):
             self.shape_embedding[col] = (self.len_unique_value[col], 1)
             x_preprocessed[col] = x[[col]].to_numpy()
 
-        print("Preprocess time_series, shapes :")
-        print(self.shape_embedding)
+        logger.info("Input shapes :")
+        logger.info(self.shape_embedding)
         return x_preprocessed
 
     def preprocessing_transform(self, x):
@@ -154,6 +157,8 @@ class ML_DenseNetwork(Model):
         params_all['name_classifier'] = self.name_classifier
         params_all['shape_y'] = self.shape_y
         params_all['nb_classes'] = self.nb_classes
+        params_all['name_numeric_features'] = self.name_numeric_features
+        params_all['shape_embedding'] = self.shape_embedding
 
         self.params_all = {self.name_model_full: params_all}
 
@@ -166,6 +171,8 @@ class ML_DenseNetwork(Model):
         self.p = p_model
         self.shape_y = params_all['shape_y']
         self.nb_classes = params_all['nb_classes']
+        self.name_numeric_features = params_all['name_numeric_features']
+        self.shape_embedding = params_all['shape_embedding']
 
     def model(self, hyper_params_clf={}):
         # Dense input
