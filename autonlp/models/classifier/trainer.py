@@ -21,7 +21,8 @@ class Model:
             - prediction on test set for each fold of a model : function : prediction()
     """
 
-    def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={}):
+    def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={},
+                 time_series_features=None, scaler_info=None):
         """
         Args:
             flags_parameters : Instance of Flags class object
@@ -48,6 +49,8 @@ class Model:
         self.apply_app = flags_parameters.apply_app
         self.seed = flags_parameters.seed
         self.ordinal_features = flags_parameters.ordinal_features
+        self.size_train_prc = flags_parameters.size_train_prc
+        self.time_series_recursive = flags_parameters.time_series_recursive
         self.name_model = None
         self.name_model_full = name_model_full
         self.class_weight = class_weight
@@ -56,6 +59,8 @@ class Model:
         self.info_scores = {}
         self.apply_autonlp = False
         self.len_unique_value = len_unique_value
+        self.time_series_features = time_series_features
+        self.scaler_info = scaler_info
 
         if self.apply_mlflow:
             import mlflow
@@ -200,7 +205,8 @@ class Model:
 
         val = Validation(self.objective, self.seed, self.is_NN, self.name_classifier, self.name_model_full,
                          self.class_weight, self.average_scoring, self.apply_mlflow, self.experiment_name,
-                         self.apply_logs, self.apply_autonlp)
+                         self.apply_logs, self.apply_autonlp, self.size_train, self.time_series_recursive,
+                         self.time_series_features, self.scaler_info)
         val.fit(model, x_train, y_train, x_val, y_val, self.flags_parameters.nfolds, self.flags_parameters.nfolds_train,
                 self.flags_parameters.cv_strategy, self.flags_parameters.scoring, self.flags_parameters.outdir,
                 self.params_all,
@@ -208,6 +214,14 @@ class Model:
 
         # store information from validation in self.info_scores :
         self.info_scores['fold_id'], self.info_scores['oof_val'] = val.get_cv_prediction()
+
+        if self.name_classifier == 'LSTM':
+            if self.index_pivot_fit != []:
+                index_pivot = self.index_pivot_fit.copy()
+                # size_train = int(y_train.shape[0] * 0.8)
+                # for i in range((y_train.shape[0] - size_train) - len(self.index_pivot_fit)):
+                #    index_pivot.remove(i)
+                self.info_scores['oof_val'] = self.info_scores['oof_val'].reshape(-1)[index_pivot]
 
         if 'binary' in self.objective:
             self.info_scores['accuracy_val'], self.info_scores['f1_val'], self.info_scores['recall_val'], \
@@ -222,7 +236,7 @@ class Model:
             self.info_scores['r2_val'] = val.get_scores()
 
     def prediction(self, x_test_before_copy=None, y_test_before_copy=None, doc_spacy_data_test=[],
-                   name_logs='last_logs', loaded_models=None):
+                   name_logs='last_logs', loaded_models=None, position_id_test=None, x_train=None, y_train=None):
         """ Apply prediction for the model on (x_test,) or (x_test,y_test)
             Models are loaded from the outdir/name_logs/name_embedding/name_model_full directory
             Average all folds prediction of a name_model to get final prediction
@@ -280,7 +294,8 @@ class Model:
         if has_saved_model:
             pred = Prediction(self.objective, self.name_classifier, self.name_model_full, self.flags_parameters.outdir,
                               name_logs, self.is_NN, self.class_weight, self.apply_mlflow, self.experiment_name,
-                              self.apply_logs, self.apply_app, self.apply_autonlp)
+                              self.apply_logs, self.apply_app, self.apply_autonlp, self.time_series_recursive,
+                              self.time_series_features, self.scaler_info)
 
             # preprocess text on x_test :
             #if self.embedding.name_model not in ['tf', 'tf-idf']:
@@ -298,7 +313,6 @@ class Model:
                 elif self.is_NN:
                     x_test = self.preprocessing_transform(x_test)
                     if time_series_recursive:
-                        x_train = x_test
                         x_train = self.preprocessing_transform(x_train)
                 info_ts = None
             else:
@@ -326,10 +340,14 @@ class Model:
             else:
                 model = None
 
-            pred.fit(model, x_test, y_test, loaded_models)
+            pred.fit(model, x_test, y_test, loaded_models, x_train, y_train, position_id_test)
 
             # store information from prediction in self.info_scores :
             self.info_scores['prediction'] = pred.get_prediction()
+
+            if self.name_classifier == 'LSTM':
+                if self.index_pivot_pred != []:
+                    self.info_scores['prediction'] = self.info_scores['prediction'].reshape(-1)[self.index_pivot_pred]
 
             if y_test is not None:
                 if 'binary' in self.objective:
@@ -426,7 +444,7 @@ class Model:
         #        if x_val is not None:
         #            x_val[x_val.columns[self.column_text]] = x_val_preprocessed
 
-        size_train_prc = 0.7
+        size_train_prc = self.size_train_prc
         if self.is_NN:
             if self.name_classifier == 'LSTM':
                 x_train, y_train = self.preprocessing_fit_transform(x_train, y_train, size_train_prc)
@@ -441,11 +459,11 @@ class Model:
 
         if 'time_series' in self.objective:
             if self.name_classifier == 'LSTM':
-                size_train = self.size_y_train_preprocessed
+                self.size_train = self.size_y_train_preprocessed
             else:
-                size_train = int(y_train.shape[0] * size_train_prc)
+                self.size_train = int(y_train.shape[0] * size_train_prc)
         else:
-            size_train = None
+            self.size_train = None
 
         ###############
         # Optimization

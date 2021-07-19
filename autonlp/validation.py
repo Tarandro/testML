@@ -6,6 +6,7 @@ from sklearn.model_selection import KFold, StratifiedKFold
 from joblib import dump, load
 import random as rd
 import os
+import time
 
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
@@ -14,6 +15,7 @@ from .utils.class_weight import compute_dict_class_weight
 
 import logging
 from .utils.logging import get_logger, verbosity_to_loglevel
+from .utils.ts_preprocessing import build_lag_features_transform, build_rolling_features_transform
 
 logger = get_logger(__name__)
 
@@ -23,7 +25,8 @@ class Validation:
 
     def __init__(self, objective, seed=15, is_NN=False, name_embedding=None, name_model_full=None, class_weight=None,
                  average_scoring="weighted", apply_mlflow=False, experiment_name="Experiment", apply_logs=True,
-                 apply_autonlp=False):
+                 apply_autonlp=False, size_train=10, time_series_recursive=False, time_series_features=None,
+                 scaler_info=None):
         """
         Args:
             objective (str) : 'binary' or 'multi-class' or 'regression'
@@ -48,6 +51,10 @@ class Validation:
         self.experiment_name = experiment_name
         self.apply_logs = apply_logs
         self.apply_autonlp = apply_autonlp
+        self.size_train = size_train
+        self.time_series_recursive = time_series_recursive
+        self.time_series_features = time_series_features
+        self.scaler_info = scaler_info
 
     def fit(self, model, x, y, x_valid=None, y_valid=None, nfolds=5, nfolds_train=5, cv_strategy="StratifiedKFold",
             scoring='accuracy', outdir='./', params_all=dict(), batch_size=16, patience=4, epochs=60, min_lr=1e-4):
@@ -73,15 +80,19 @@ class Validation:
 
         if x_valid is None:
             self.fold_id = np.ones((len(y),)) * -1
-            # Cross-validation split in self.nfolds but train only on self.nfolds_train chosen randomly :
-            rd.seed(self.seed)
-            fold_to_train = rd.sample([i for i in range(nfolds)], k=max(min(nfolds_train, nfolds), 1))
-            if cv_strategy == "StratifiedKFold":
-                skf = StratifiedKFold(n_splits=nfolds, random_state=self.seed, shuffle=True)
-                folds = skf.split(y, y)
+            if "time_series" not in self.objective:
+                # Cross-validation split in self.nfolds but train only on self.nfolds_train chosen randomly :
+                rd.seed(self.seed)
+                fold_to_train = rd.sample([i for i in range(nfolds)], k=max(min(nfolds_train, nfolds), 1))
+                if cv_strategy == "StratifiedKFold":
+                    skf = StratifiedKFold(n_splits=nfolds, random_state=self.seed, shuffle=True)
+                    folds = skf.split(y, y)
+                else:
+                    kf = KFold(n_splits=nfolds, shuffle=True, random_state=self.seed)
+                    folds = kf.split(y)
             else:
-                kf = KFold(n_splits=nfolds, shuffle=True, random_state=self.seed)
-                folds = kf.split(y)
+                folds = [('all', [i for i in range(self.size_train)])]
+                fold_to_train = [0]
         else:
             self.fold_id = np.ones((len(y_valid),)) * -1
             folds = [('all', [i for i in range(y_valid.shape[0])])]
@@ -231,7 +242,80 @@ class Validation:
                                                                                    -(p + 1)]))
                 total_epochs += len(train_history.history[monitor][:-(p + 1)])
 
-                pred_val = model_nn.predict(x_val)
+                if "time_series" in self.objective and 'lstm' in self.name_model_full.lower() and self.time_series_recursive:  # use predicted time series for next prediction
+                    prediction_steps = x_val['inp'].shape[0]
+                    timesteps = x_val['inp'].shape[1]
+                    x_shape2 = x_val['inp'].shape[2]
+                    y_shape2 = y_val.shape[1]
+
+                    x_preprocessed = {}
+                    for col in x_val.keys():
+                        x_preprocessed[col] = np.array([x_val[col][0]])
+
+                    predictions = []
+                    for j in range(timesteps, timesteps + prediction_steps):
+                        predicted_stock_price = model_nn.predict(x_preprocessed)
+
+                        inp = np.append(x_preprocessed['inp'], predicted_stock_price).reshape(1, timesteps + 1,
+                                                                                              x_shape2)
+
+                        x_preprocessed = {'inp': inp[0, -timesteps:].reshape(1, timesteps, x_shape2)}
+                        for col in x.keys():
+                            if col != 'inp':
+                                x_preprocessed[col] = np.array([x[col][j - timesteps]])
+
+                        # pred = scaler_ts.inverse_transform(predicted_stock_price.reshape(1,-1))
+                        pred = predicted_stock_price.reshape(1, -1)
+                        predictions.append(pred)
+                    pred_val = np.array(predictions).reshape(prediction_steps, y_shape2)
+
+                elif "time_series" in self.objective and "dense_network" in self.name_model_full.lower() and self.time_series_recursive:
+                    # lag_features and rolling features day after day
+                    step_lags, step_rolling, win_type, position_id, position_date = self.time_series_features
+
+                    max_feat = np.max(step_lags + step_rolling) + 1
+                    date_for_train = list(x['inp'].iloc[train_index][position_date].unique()[-max_feat:])
+                    data_test = x['inp'].iloc[train_index][x['inp'][position_date].isin(date_for_train)].copy()
+                    y_test = y[y.index.isin(list(data_test.index))].copy()
+                    start = time.perf_counter()
+                    if position_id is None:
+                        pass
+                    else:
+                        if isinstance(position_id, str):
+                            pass
+                        else:
+                            position_id = pd.concat(
+                                [position_id[position_id.index.isin(list(data_test.index))], position_id.iloc[train_index]],
+                                axis=0, ignore_index=True)
+
+                    pred_val = np.zeros(y_val.shape)
+                    index = 0
+                    for date in x['inp'].iloc[train_index][position_date].unique():
+                        x_val_inp = x['inp'].iloc[train_index][x['inp'][position_date].isin([date])].copy()
+                        data_test = pd.concat([data_test, x_val_inp], axis=0, ignore_index=True)
+                        data_test[self.scaler_info[1]] = self.scaler_info[0].inverse_transform(
+                            data_test[self.scaler_info[1]])
+
+                        data_test = build_lag_features_transform(data_test, pd.concat(
+                            [y_test, pd.DataFrame(pred_val[:len(data_test) - len(y_test)], columns=y_test.columns)],
+                            axis=0, ignore_index=True),
+                                                                 step_lags, position_id)
+                        data_test = build_rolling_features_transform(data_test, pd.concat(
+                            [y_test, pd.DataFrame(pred_val[:len(data_test) - len(y_test)], columns=y_test.columns)],
+                            axis=0, ignore_index=True),
+                                                                     step_rolling, win_type, position_id)
+                        data_test[self.scaler_info[1]] = self.scaler_info[0].transform(data_test[self.scaler_info[1]])
+
+                        x_preprocessed = {'inp': data_test[-len(x_val_inp):].values}
+                        for col in x_val.keys():
+                            if col != 'inp':
+                                x_preprocessed[col] = x_val[col][index:(index + len(x_val_inp))]
+                        pred_val[index:(index + len(x_val_inp))] = model_nn.predict(x_preprocessed)
+                        index += len(x_val_inp)
+                    print('Time prediction_val :', time.perf_counter() - start)
+                else:
+                    pred_val = model_nn.predict(x_val)
+
                 if first_fold:
                     first_fold = False
                     if 'binary' in self.objective or ('regression' in self.objective and y.shape[1] == 1):
@@ -321,10 +405,61 @@ class Validation:
                 if self.apply_logs:
                     dump(model_skl, '{}/fold{}.joblib'.format(outdir_model, num_fold))
 
-                if 'regression' in self.objective:
-                    pred_val = model_skl.predict(x_val)
+                if 'time_series' in self.objective and self.time_series_recursive:
+                    # lag_features and rolling features day after day
+                    step_lags, step_rolling, win_type, position_id, position_date = self.time_series_features
+
+                    max_feat = np.max(step_lags + step_rolling) + 1
+                    date_for_train = list(x.iloc[train_index][position_date].unique()[-max_feat:])
+                    data_test = x.iloc[train_index][x[position_date].isin(date_for_train)].copy()
+                    y_test = y[y.index.isin(list(data_test.index))].copy()
+                    start = time.perf_counter()
+
+                    if position_id is None:
+                        pass
+                    else:
+                        if isinstance(position_id, str):
+                            pass
+                        else:
+                            position_id = pd.concat(
+                                [position_id[position_id.index.isin(list(data_test.index))], position_id.iloc[train_index]],
+                                axis=0, ignore_index=True)
+
+                    if y_val.shape[1] == 1:
+                        pred_val = np.zeros(y_val.shape[0])
+                    else:
+                        pred_val = np.zeros(y_val.shape)
+                    index = 0
+                    for date in x.iloc[train_index][position_date].unique():
+                        x_val = x.iloc[train_index][x[position_date].isin([date])].copy()
+                        data_test = pd.concat([data_test, x_val], axis=0, ignore_index=True)
+                        data_test[self.scaler_info[1]] = self.scaler_info[0].inverse_transform(
+                            data_test[self.scaler_info[1]])
+
+                        data_test = build_lag_features_transform(data_test, pd.concat(
+                            [y_test, pd.DataFrame(pred_val[:len(data_test) - len(y_test)], columns=y_test.columns)],
+                            axis=0, ignore_index=True),
+                                                                 step_lags, position_id)
+                        data_test = build_rolling_features_transform(data_test, pd.concat(
+                            [y_test, pd.DataFrame(pred_val[:len(data_test) - len(y_test)], columns=y_test.columns)],
+                            axis=0, ignore_index=True),
+                                                                     step_rolling, win_type, position_id)
+                        data_test[self.scaler_info[1]] = self.scaler_info[0].transform(data_test[self.scaler_info[1]])
+
+                        if 'regression' in self.objective:
+                            pred_val[index:(index + len(x_val))] = model_skl.predict(data_test[-len(x_val):].values)
+                        else:
+                            pred_val[index:(index + len(x_val))] = model_skl.predict_proba(data_test[-len(x_val):].values)
+                        index += len(x_val)
+                    print('Time prediction_val :', time.perf_counter() - start)
+                    del data_test, y_test
                 else:
-                    pred_val = model_skl.predict_proba(x_val)
+                    if 'regression' in self.objective:
+                        pred_val = model_skl.predict(x_val)
+                    else:
+                        pred_val = model_skl.predict_proba(x_val)
+
+
 
                 if first_fold:
                     first_fold = False

@@ -64,6 +64,7 @@ class Flags:
     ### Preprocessing Time-Series
     startDate_train: str = 'all'  # or int  need to be a continuous numeric column
     endDate_train: str = 'all'    # or int
+    timesteps: int = 5
     position_id: str = field(default_factory=lambda: None)   # can be a dataframe
     position_date: str = field(default_factory=lambda: None)   # need to be a continuous numeric column
     size_train_prc: float = 0.8
@@ -302,6 +303,17 @@ class Flags:
     dnn_learning_rate: list = field(default_factory=lambda: [1e-2, 1e-3])
     dnn_dropout_rate_min: float = 0.0
     dnn_dropout_rate_max: float = 0.5
+
+    # LSTM
+    lstm_hidden_unit_1_min: int = 60
+    lstm_hidden_unit_1_max: int = 120
+    lstm_hidden_unit_2_min: int = 60
+    lstm_hidden_unit_2_max: int = 120
+    lstm_hidden_unit_3_min: int = 60
+    lstm_hidden_unit_3_max: int = 120
+    lstm_learning_rate: list = field(default_factory=lambda: [1e-2, 1e-3])
+    lstm_dropout_rate_min: float = 0.0
+    lstm_dropout_rate_max: float = 0.5
 
     ### Classifier Neural Network
     # GlobalAverage

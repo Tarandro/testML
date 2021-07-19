@@ -10,8 +10,10 @@ class ML_RandomForest(Model):
     name_classifier = 'RandomForest'
     is_NN = False
 
-    def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={}):
-        Model.__init__(self, flags_parameters, name_model_full, class_weight, len_unique_value)
+    def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={},
+                 time_series_features=None, scaler_info=None):
+        Model.__init__(self, flags_parameters, name_model_full, class_weight, len_unique_value, time_series_features,
+                       scaler_info)
 
     def hyper_params(self, size_params='small'):
         parameters = dict()

@@ -17,12 +17,12 @@ flags_dict_info = {
     "seed": 15,
     "apply_app": False,
 
-    "target": ["Exited"]
+    "target": ["sold"]
 }
 
 flags_dict_autonlp = {
-    "objective": 'binary',    # 'binary' or 'multi-class' or 'regression'
-    "include_model": ['dense_network'],  # 'tf+Naive_Bayes', 'tf+SGD_Classifier', 'tf+Logistic_Regression', 'doc2vec+attention'],
+    "objective": 'time_series_regression',    # 'binary' or 'multi-class' or 'regression'
+    "include_model": ['lstm'],  # 'logistic_regression', 'randomforest', 'lightgbm', 'xgboost', 'catboost', 'dense_network'
     "max_run_time_per_model": 60,
     "frac_trainset": 0.7,
     "scoring": 'f1',
@@ -74,9 +74,9 @@ flags_dict_ml_preprocessing = {
 
 flags_dict_ts_preprocessing = {
     "startDate_train": 'all',  # or int  need to be a continuous numeric column
-    "endDate_train": 'all',    # or int
+    "endDate_train": 1920,    # or int
     "position_id": None,   # can be a dataframe
-    "position_date": None,   # need to be a continuous numeric column
+    "position_date": "d",   # need to be a continuous numeric column
     "size_train_prc": 0.8,
     "time_series_recursive": False,
     "LSTM_date_features": [],

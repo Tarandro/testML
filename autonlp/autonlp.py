@@ -48,6 +48,7 @@ from .models.classifier.lightgbm import ML_LightGBM
 from .models.classifier.xgboost import ML_XGBoost
 from .models.classifier.catboost import ML_CatBoost
 from .models.classifier.dense_network import ML_DenseNetwork
+from .models.classifier.lstm import ML_LSTM
 
 from .models.embeddings.trainer import Embedding
 
@@ -196,6 +197,7 @@ class AutoNLP:
         self.embeddings = {}  # variable to store all embeddings from :class: Embedding
         self.info_models = {}
         self.info_scores = {}  # variable to store all information scores
+        self.time_series_features = None
 
         # Assert parameters
         assert self.flags_parameters.objective in ['binary', 'multi-class',
@@ -753,7 +755,7 @@ class AutoNLP:
         else:
             dict_classifiers = {'logistic_regression': ML_Logistic_Regression, 'randomforest': ML_RandomForest,
                                 'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost,
-                                'dense_network': ML_DenseNetwork}
+                                'dense_network': ML_DenseNetwork, "lstm": ML_LSTM}
             class_models = [dict_classifiers[name_classifier.lower()] for name_classifier in self.name_classifiers]
 
         # Compute each NLP model :
@@ -778,7 +780,8 @@ class AutoNLP:
             else:
 
                 self.models[name_model] = class_models[i](self.flags_parameters, name_model, self.class_weight,
-                                                          self.len_unique_value)
+                                                          self.len_unique_value, self.time_series_features,
+                                                          self.scaler_info)
 
                 self.models[name_model].automl(self.x_train, self.y_train, self.x_val, self.y_val,
                                                self.apply_optimization, self.apply_validation)
@@ -1353,7 +1356,7 @@ class AutoNLP:
         else:
             dict_classifiers = {'logistic_regression': ML_Logistic_Regression, 'randomforest': ML_RandomForest,
                                 'lightgbm': ML_LightGBM, 'xgboost': ML_XGBoost, 'catboost': ML_CatBoost,
-                                'dense_network': ML_DenseNetwork}
+                                'dense_network': ML_DenseNetwork, "lstm": ML_LSTM}
             name_classifier = params_all["name_classifier"]
             class_model = dict_classifiers[name_classifier.lower()]
 
@@ -1394,7 +1397,8 @@ class AutoNLP:
 
     def single_prediction(self, name_embedding=None, name_model=None, model_ml=None, loaded_models=None,
                           name_logs='last_logs', on_test_data=True, x=None, y=None, doc_spacy_data_test=None,
-                          return_model=False, return_scores=False, proba=True):
+                          return_model=False, return_scores=False, proba=True, position_id_test=None,
+                          x_train=None, y_train=None):
         """ Prediction on x or X_test (if on_test_data=True or x == None) for best name_model model
                     Do not work for 'BlendModel'
             Args:
@@ -1421,7 +1425,8 @@ class AutoNLP:
             doc_spacy_data_test = self.doc_spacy_data_test
 
         if name_logs == 'last_logs' and self.apply_app is False:
-            self.models[name_model].prediction(x, y, doc_spacy_data_test, name_logs)
+            self.models[name_model].prediction(x, y, doc_spacy_data_test, name_logs,
+                                               position_id_test=position_id_test, x_train=x_train, y_train=y_train)
 
             prediction = self.models[name_model].info_scores['prediction']
             if not proba and 'regression' not in self.objective:
@@ -1446,7 +1451,8 @@ class AutoNLP:
                 else:
                     model_ml = self.create_model_class(name_embedding, name_model, name_logs)
 
-            model_ml.prediction(x, y, doc_spacy_data_test, name_logs, loaded_models)
+            model_ml.prediction(x, y, doc_spacy_data_test, name_logs, loaded_models,
+                                position_id_test=position_id_test, x_train=x_train, y_train=y_train)
 
             prediction = model_ml.info_scores['prediction']
             if not proba and 'regression' not in self.objective:
@@ -1483,7 +1489,8 @@ class AutoNLP:
                 else:
                     return prediction, scores
 
-    def leader_predict(self, name_logs='last_logs', on_test_data=True, x=None, y=None, doc_spacy_data_test=None):
+    def leader_predict(self, name_logs='last_logs', on_test_data=True, x=None, y=None, doc_spacy_data_test=None,
+                       position_id_test=None, x_train=None, y_train=None):
         """ Prediction on x or X_test (if on_test_data=True or x == None) for each best models
         Args:
             name_logs (str) 'last_logs' or 'best_logs'
@@ -1495,6 +1502,8 @@ class AutoNLP:
         if on_test_data or x is None:  # predict on self.X_test
             x = self.X_test
             y = self.Y_test
+            x_train = self.X_train
+            y_train = self.Y_train
             doc_spacy_data_test = self.doc_spacy_data_test
 
         # use self.models to get models:
@@ -1507,7 +1516,8 @@ class AutoNLP:
                     name_embedding = self.models[name_model].name_classifier
                     _ = self.single_prediction(name_embedding, name_model, name_logs=name_logs,
                                                on_test_data=on_test_data, x=x,
-                                               y=y, doc_spacy_data_test=doc_spacy_data_test)
+                                               y=y, doc_spacy_data_test=doc_spacy_data_test,
+                                               position_id_test=position_id_test, x_train=x_train, y_train=y_train)
             if self.apply_logs:
                 leaderboard_test = self.get_leaderboard(sort_by=self.flags_parameters.sort_leaderboard, dataset='test')
                 self.save_scores_plot(leaderboard_test, name_logs)
@@ -1575,7 +1585,8 @@ class AutoNLP:
                 _, model_nlp = self.single_prediction(name_embedding, name_model, name_logs=name_logs,
                                                       on_test_data=on_test_data, x=x,
                                                       y=y, doc_spacy_data_test=doc_spacy_data_test,
-                                                      return_model=True)
+                                                      return_model=True,
+                                                      position_id_test=position_id_test, x_train=x_train, y_train=y_train)
                 self.info_models[name_model] = model_nlp
                 n_models += 1
 
