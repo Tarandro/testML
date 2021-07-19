@@ -16,9 +16,9 @@ class ML_DenseNetwork(Model):
     is_NN = True
 
     def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={},
-                 time_series_features=None, scaler_info=None):
+                 time_series_features=None, scaler_info=None, position_id=None):
         Model.__init__(self, flags_parameters, name_model_full, class_weight, len_unique_value, time_series_features,
-                       scaler_info)
+                       scaler_info, position_id)
         self.batch_size = self.flags_parameters.batch_size
         self.patience = self.flags_parameters.patience
         self.epochs = self.flags_parameters.epochs

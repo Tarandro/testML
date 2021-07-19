@@ -22,7 +22,7 @@ class Model:
     """
 
     def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={},
-                 time_series_features=None, scaler_info=None):
+                 time_series_features=None, scaler_info=None, position_id=None):
         """
         Args:
             flags_parameters : Instance of Flags class object
@@ -51,6 +51,7 @@ class Model:
         self.ordinal_features = flags_parameters.ordinal_features
         self.size_train_prc = flags_parameters.size_train_prc
         self.time_series_recursive = flags_parameters.time_series_recursive
+        self.LSTM_date_features = flags_parameters.LSTM_date_features
         self.name_model = None
         self.name_model_full = name_model_full
         self.class_weight = class_weight
@@ -61,6 +62,7 @@ class Model:
         self.len_unique_value = len_unique_value
         self.time_series_features = time_series_features
         self.scaler_info = scaler_info
+        self.position_id = position_id
 
         if self.apply_mlflow:
             import mlflow

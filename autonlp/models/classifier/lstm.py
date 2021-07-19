@@ -19,15 +19,14 @@ class ML_LSTM(Model):
     is_NN = True
 
     def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={},
-                 time_series_features=None, scaler_info=None):
+                 time_series_features=None, scaler_info=None, position_id=None):
         Model.__init__(self, flags_parameters, name_model_full, class_weight, len_unique_value, time_series_features,
-                       scaler_info)
+                       scaler_info, position_id)
         self.batch_size = self.flags_parameters.batch_size
         self.patience = self.flags_parameters.patience
         self.epochs = self.flags_parameters.epochs
         self.min_lr = self.flags_parameters.min_lr
 
-        self.position_id = self.flags_parameters.position_id
         self.position_date = self.flags_parameters.position_date
         self.timesteps = self.flags_parameters.timesteps
 
@@ -88,7 +87,7 @@ class ML_LSTM(Model):
 
         return parameters
 
-    def preprocessing_fit_transform(self, x, y, size_train_prc=0.9, size_params='small'):
+    def preprocessing_fit_transform(self, x, y, size_train_prc=0.9):
         self.ordered_column = list(x.columns)
         size_train = int(y.shape[0] * size_train_prc)
         if x is not None:

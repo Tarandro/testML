@@ -142,41 +142,37 @@ class Validation:
                     # validation
                     if isinstance(x, dict):
                         x_train, x_val = x, x_valid
-                        y_train, y_val = y.values, y_valid.values
                     elif isinstance(x, list):
                         x_train, x_val = x, x_valid
-                        y_train, y_val = y.values, y_valid.values
                     else:
                         if isinstance(x, pd.DataFrame):
                             x_train, x_val = x.values, x_valid.values
                         else:
                             x_train, x_val = x, x_valid
-                        if isinstance(y, pd.DataFrame):
-                            y_train, y_val = y.values, y_valid.values
-                        else:
-                            y_train, y_val = y, y_valid
+                    if isinstance(y, pd.DataFrame):
+                        y_train, y_val = y.values, y_valid.values
+                    else:
+                        y_train, y_val = y, y_valid
                 else:
                     # cross-validation
                     if isinstance(x, dict):
                         x_train, x_val = {}, {}
                         for col in x.keys():
                             x_train[col], x_val[col] = x[col][train_index], x[col][val_index]
-                        y_train, y_val = y.values[train_index], y.values[val_index]
                     elif isinstance(x, list):
                         x_train, x_val = [], []
                         for col in range(len(x)):
                             x_train.append(x[col][train_index])
                             x_val.append(x[col][val_index])
-                        y_train, y_val = y.values[train_index], y.values[val_index]
                     else:
                         if isinstance(x, pd.DataFrame):
                             x_train, x_val = x.values[train_index], x.values[val_index]
                         else:
                             x_train, x_val = x[train_index], x[val_index]
-                        if isinstance(y, pd.DataFrame):
-                            y_train, y_val = y.values[train_index], y.values[val_index]
-                        else:
-                            y_train, y_val = y[train_index], y[val_index]
+                    if isinstance(y, pd.DataFrame):
+                        y_train, y_val = y.values[train_index], y.values[val_index]
+                    else:
+                        y_train, y_val = y[train_index], y[val_index]
 
                 K.clear_session()
 

@@ -42,6 +42,8 @@ class Preprocessing:
             apply_entity_preprocessing (Boolean) step 3 of transform
         """
 
+        self.flags_parameters = flags_parameters
+
         self.type_columns = flags_parameters.type_columns
         self.ordinal_features = flags_parameters.ordinal_features
 
@@ -67,7 +69,6 @@ class Preprocessing:
         self.feature_selection_threshold = flags_parameters.feature_selection_threshold
         self.remove_percentage = flags_parameters.remove_percentage
 
-        self.position_id = flags_parameters.position_id
         self.step_lags = flags_parameters.step_lags
         self.step_rolling = flags_parameters.step_rolling
         self.win_type = flags_parameters.win_type
@@ -696,29 +697,29 @@ class Preprocessing:
     # Time Series
     ##################
 
-    def build_lag_features(self, data):
+    def build_lag_features(self, data, position_id):
         """ Lag features : take the value from i step_date of the current date"""
 
         print('Shifting:', self.step_lags)
-        if self.position_id is None:
+        if position_id is None:
             for col in self.target:
                 for i in self.step_lags:
                     data[col + '_lag_' + str(i)] = self.Y[col].transform(lambda x: x.shift(i)).fillna(0)
         else:
-            if isinstance(self.position_id, str):
-                dt = pd.concat([data[[self.position_id]], self.Y], axis=1)
+            if isinstance(position_id, str):
+                dt = pd.concat([data[[position_id]], self.Y], axis=1)
             else:
-                dt = pd.concat([self.position_id, self.Y], axis=1)
+                dt = pd.concat([position_id, self.Y], axis=1)
             for i in self.step_lags:
                 new_name_column = [col + '_lag_' + str(i) for col in self.target]
                 data[new_name_column] = dt.groupby(dt.columns[0], as_index=False)[self.target].shift(i).fillna(0)
         return data
 
-    def build_rolling_features(self, data):
+    def build_rolling_features(self, data, position_id):
         """ Rolling features : mean and std of i last step_date """
 
         print('Rolling period:', self.step_rolling)
-        if self.position_id is None:
+        if position_id is None:
             for col in self.target:
                 for i in self.step_rolling:
                     data[col + '_rolling_mean_' + str(i)] = self.Y[col].transform(
@@ -726,10 +727,10 @@ class Preprocessing:
                     data[col + '_rolling_std_' + str(i)] = self.Y[col].transform(
                         lambda x: x.rolling(i, win_type=self.win_type).std()).fillna(0)
         else:
-            if isinstance(self.position_id, str):
-                dt = pd.concat([data[[self.position_id]], self.Y], axis=1)
+            if isinstance(position_id, str):
+                dt = pd.concat([data[[position_id]], self.Y], axis=1)
             else:
-                dt = pd.concat([self.position_id, self.Y], axis=1)
+                dt = pd.concat([position_id, self.Y], axis=1)
             for i in self.step_rolling:
                 new_name_column = [col + '_rolling_mean_' + str(i) for col in self.target]
                 data[new_name_column] = dt.groupby(dt.columns[0], as_index=False)[self.target].transform(
@@ -800,6 +801,13 @@ class Preprocessing:
             self.column_text = None
             doc_spacy_data = None
 
+        # Position ID for time_series objective
+        if self.flags_parameters.position_id is not None and self.flags_parameters.position_id in data.columns and isinstance(
+                self.flags_parameters.position_id, str):
+            position_id = data[[self.flags_parameters.position_id]]
+        else:
+            position_id = self.flags_parameters.position_id
+
         if self.apply_preprocessing_mandatory:
             data = self.preprocessing_mandatory(data)
 
@@ -814,9 +822,9 @@ class Preprocessing:
 
         # for time series:
         if len(self.step_lags) > 0:
-            data = self.build_lag_features(data)
+            data = self.build_lag_features(data, position_id)
         if len(self.step_rolling) > 0:
-            data = self.build_rolling_features(data)
+            data = self.build_rolling_features(data, position_id)
 
         if len(self.info_tsne.keys()) > 0:
             data = self.build_fe_tsne(data)
@@ -837,7 +845,7 @@ class Preprocessing:
         self.list_final_columns = list(data.columns)
         pickle.dump(self.list_final_columns, open(os.path.join(self.outdir_pre, "list_final_columns.pkl"), "wb"))
 
-        return data, doc_spacy_data
+        return data, doc_spacy_data, position_id
 
     def transform(self, data_test):
 
@@ -851,6 +859,13 @@ class Preprocessing:
             data_test = data_test.drop([self.column_text], axis=1)
         else:
             doc_spacy_data_test = None
+
+        # Position ID for time_series objective
+        if self.flags_parameters.position_id is not None and self.flags_parameters.position_id in data_test.columns and isinstance(
+                    self.flags_parameters.position_id, str):
+            position_id_test = data_test[[self.flags_parameters.position_id]]
+        else:
+            position_id_test = self.flags_parameters.position_id
 
         if self.apply_preprocessing_mandatory:
             data_test = self.preprocessing_mandatory_transform(data_test)
@@ -886,7 +901,7 @@ class Preprocessing:
             if col not in data_test.columns:
                 print(col, 'is not in test data')
 
-        return data_test, doc_spacy_data_test
+        return data_test, doc_spacy_data_test, position_id_test
 
     def load_parameters(self):
         try:

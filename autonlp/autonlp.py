@@ -152,7 +152,6 @@ class AutoNLP:
         self.apply_blend_model = flags_parameters.apply_blend_model
         self.method_embedding = {k.lower(): v for k, v in flags_parameters.method_embedding.items()}
 
-        self.position_id = flags_parameters.position_id
         self.position_date = flags_parameters.position_date
         self.size_train_prc = flags_parameters.size_train_prc
         self.time_series_recursive = flags_parameters.time_series_recursive
@@ -200,8 +199,8 @@ class AutoNLP:
         self.time_series_features = None
 
         # Assert parameters
-        assert self.flags_parameters.objective in ['binary', 'multi-class',
-                                                   'regression'], "Possible objective are 'binary', 'multi-class' or 'regression'"
+        # assert self.flags_parameters.objective in ['binary', 'multi-class',
+        #                                           'regression'], "Possible objective are 'binary', 'multi-class' or 'regression'"
         assert self.flags_parameters.language_text in ['fr', 'en'], "Possible language are 'fr' and 'en'"
         assert self.flags_parameters.cv_strategy in ['StratifiedKFold',
                                                      'KFold'], "Only StratifiedKFold and Kfold cv_strategy are implemented"
@@ -214,15 +213,15 @@ class AutoNLP:
                 logger.warning("\nYou set language '{}' but {} is not a spacy french model".format(lg,
                                                                                                    self.flags_parameters.name_spacy_model))
 
-        if self.flags_parameters.objective == 'binary':
+        if 'binary' in self.flags_parameters.objective:
             if self.flags_parameters.scoring not in ['accuracy', 'f1', 'recall', 'precision', 'roc_auc']:
                 logger.warning("\nYou probably set a scoring metric not adapted for binary classification")
 
-        if self.flags_parameters.objective == 'multi-class':
+        if 'multi-class' in self.flags_parameters.objective:
             if self.flags_parameters.scoring not in ['accuracy', 'f1', 'recall', 'precision']:
                 logger.warning("\nYou probably set a scoring metric not adapted for multi-class classification")
 
-        if self.flags_parameters.objective == 'regression':
+        if 'regression' in self.flags_parameters.objective:
             if self.flags_parameters.scoring not in ['mse', 'explained_variance', 'r2']:
                 logger.warning("\nYou probably set a scoring metric not adapted for regression classification")
 
@@ -286,6 +285,11 @@ class AutoNLP:
             if endDate_train != 'all' and endDate_train != self.Y.index[-1]:
                 self.Y_test = self.Y.loc[endDate_train:, :].copy()
 
+            if self.position_id is not None:
+                self.position_id_train = self.position_id[self.position_id.index.isin(list(self.Y_train.index))]
+            else:
+                self.position_id_train = None
+
         else:
             if startDate_train == 'all' and endDate_train == 'all':
                 self.X_train = self.data
@@ -302,14 +306,24 @@ class AutoNLP:
             else:
                 self.doc_spacy_data_train = None
 
+            if self.position_id is not None:
+                self.position_id_train = self.position_id[self.position_id.index.isin(list(self.X_train.index))]
+            else:
+                self.position_id_train = None
+
             if endDate_train != 'all' and endDate_train != np.max(self.data[self.position_date]):
                 self.X_test = self.data[self.data[self.position_date] > endDate_train]
                 if self.doc_spacy_data is not None:
                     self.doc_spacy_data_test = np.array(self.doc_spacy_data)[list(self.X_test.index)]
                 else:
                     self.doc_spacy_data_test = None
+                if self.position_id is not None:
+                    self.position_id_test = self.position_id[self.position_id.index.isin(list(self.X_test.index))]
+                else:
+                    self.position_id_test = None
             else:
                 self.doc_spacy_data_test = None
+                self.position_id_test = None
 
             #del self.data
 
@@ -394,7 +408,7 @@ class AutoNLP:
         # Preprocessing
         logger.info("\nBegin preprocessing of {} data :".format(len(data)))
         self.pre = Preprocessing(data, self.flags_parameters)
-        self.data, self.doc_spacy_data = self.pre.fit_transform(data)
+        self.data, self.doc_spacy_data, self.position_id = self.pre.fit_transform(data)
 
         # WARNING : self.column_text (int) is now the column number of self.column_text (str) in self.data
         if self.pre.column_text is not None:
@@ -432,7 +446,7 @@ class AutoNLP:
             if 'time_series' in self.objective:
                 self.split_data_ts(self.flags_parameters.startDate_train, self.flags_parameters.endDate_train)
                 self.time_series_features = (
-                self.pre.step_lags, self.pre.step_rolling, self.pre.win_type, self.position_id, self.position_date)
+                self.pre.step_lags, self.pre.step_rolling, self.pre.win_type, self.position_id_train, self.position_date)
             else:
                 self.split_data()
                 self.time_series_features = None
@@ -444,7 +458,7 @@ class AutoNLP:
             if 'time_series' in self.objective:
                 self.split_data_ts("all", "all")
                 self.time_series_features = (
-                    self.pre.step_lags, self.pre.step_rolling, self.pre.win_type, self.position_id, self.position_date)
+                    self.pre.step_lags, self.pre.step_rolling, self.pre.win_type, self.position_id_train, self.position_date)
             else:
                 self.frac_trainset = 1
                 self.split_data()
@@ -517,11 +531,11 @@ class AutoNLP:
                             y_test[y_test.columns[i]] = y_test[y_test.columns[i]].map(self.flags_parameters.map_label)
             else:
                 y_test = None
-            data_test, doc_spacy_data_test = self.pre.transform(data_test)
+            data_test, doc_spacy_data_test, position_id_test = self.pre.transform(data_test)
         else:
             self.pre = Preprocessing(data_test, self.flags_parameters)
             self.pre.load_parameters()
-            data_test, doc_spacy_data_test = self.pre.transform(data_test)
+            data_test, doc_spacy_data_test, position_id_test = self.pre.transform(data_test)
             if self.pre.column_text is not None:
                 self.column_text = list(data_test.columns).index(self.pre.column_text)
             else:
@@ -540,9 +554,9 @@ class AutoNLP:
                 self.apply_autonlp = True
 
         if y_test is None:
-            return data_test, doc_spacy_data_test
+            return data_test, doc_spacy_data_test, position_id_test
         else:
-            return data_test, doc_spacy_data_test, y_test
+            return data_test, doc_spacy_data_test, position_id_test, y_test
 
     def prepare_model(self, x=None, y=None, x_val=None, y_val=None):
         """ Compute each NLP model :
@@ -781,7 +795,7 @@ class AutoNLP:
 
                 self.models[name_model] = class_models[i](self.flags_parameters, name_model, self.class_weight,
                                                           self.len_unique_value, self.time_series_features,
-                                                          self.scaler_info)
+                                                          self.scaler_info, self.position_id)
 
                 self.models[name_model].automl(self.x_train, self.y_train, self.x_val, self.y_val,
                                                self.apply_optimization, self.apply_validation)
@@ -1505,6 +1519,7 @@ class AutoNLP:
             x_train = self.X_train
             y_train = self.Y_train
             doc_spacy_data_test = self.doc_spacy_data_test
+            position_id_test = self.position_id_test
 
         # use self.models to get models:
         if name_logs == 'last_logs':

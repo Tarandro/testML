@@ -8,7 +8,7 @@ from autonlp.flags import Flags
 
 flags_dict_info = {
     "debug": False,  # for debug : use only 50 data rows for training
-    "path_data": "C:/Users/agassmann/Documents/data/churn_modelling.csv",
+    "path_data": "C:/Users/agassmann/Documents/data/data_time_series.csv",
     "path_data_validation": "",
     "apply_logs": True,
     "outdir": "./logs",
@@ -25,10 +25,10 @@ flags_dict_autonlp = {
     "include_model": ['lstm'],  # 'logistic_regression', 'randomforest', 'lightgbm', 'xgboost', 'catboost', 'dense_network'
     "max_run_time_per_model": 60,
     "frac_trainset": 0.7,
-    "scoring": 'f1',
+    "scoring": 'mse',
     "nfolds": 5,
     "nfolds_train": 1,
-    "class_weight": True,
+    "class_weight": False,
     "apply_blend_model": True,
     "verbose": 2,
     "method_embedding": {'Word2vec': 'Word2Vec',
@@ -45,15 +45,16 @@ flags_dict_autonlp = {
 
 flags_dict_ml_preprocessing = {
 
-    "ordinal_features": [],  # "Geography"
+    "ordinal_features": ["item_id", "dept_id", "store_id", "cat_id", "state_id", "wday", "month",
+                         "year", 'event_name_1', 'event_type_1', 'event_name_2', 'event_type_2'],
     "normalize": True,
     "method_scaling": 'MinMaxScaler',   # 'MinMaxScaler', 'RobustScaler', 'StandardScaler'
     "type_columns": None,
     "apply_preprocessing_mandatory": True,
-    "remove_categorical": False,
+    "remove_categorical": True,
 
-    "method_nan_categorical": 'constant',
-    "method_nan_numeric": 'mean',
+    "method_nan_categorical": 'ffill',
+    "method_nan_numeric": 'ffill',
     "subsample": 0.3,
     "feature_interaction": False,
     "feature_ratio": False,
@@ -62,7 +63,7 @@ flags_dict_ml_preprocessing = {
     "multicollinearity_threshold": 0.9,
     "feature_selection": False,
     "feature_selection_threshold": 0.8,
-    "bin_numeric_features": ["EstimatedSalary"],
+    "bin_numeric_features": [],
     "remove_low_variance": False,
     "remove_percentage": 0.8,
     "info_pca": {}, # {'all':('all',2)},
@@ -75,13 +76,15 @@ flags_dict_ml_preprocessing = {
 flags_dict_ts_preprocessing = {
     "startDate_train": 'all',  # or int  need to be a continuous numeric column
     "endDate_train": 1920,    # or int
-    "position_id": None,   # can be a dataframe
+    "position_id": "id",   # can be a dataframe
     "position_date": "d",   # need to be a continuous numeric column
-    "size_train_prc": 0.8,
+    "size_train_prc": 0.9,
     "time_series_recursive": False,
-    "LSTM_date_features": [],
-    "step_lags": [],
-    "step_rolling": [],
+    "LSTM_date_features": ['wday', 'month', 'year', 'event_name_1', 'event_type_1', 'event_name_2',
+                           'event_type_2', 'snap_CA', 'snap_TX', 'snap_WI'],
+    "timesteps": 14,
+    "step_lags": [1,3,7],
+    "step_rolling": [7],
     "win_type": None
 }
 
@@ -95,12 +98,13 @@ flags_dict_nlp_preprocessing = {
 }
 
 flags_dict_display = {
-    "sort_leaderboard": 'f1'
+    "sort_leaderboard": 'mse'
 }
 
 flags = Flags().update(flags_dict_info)
 flags = flags.update(flags_dict_ml_preprocessing)
 flags = flags.update(flags_dict_nlp_preprocessing)
+flags = flags.update(flags_dict_ts_preprocessing)
 flags = flags.update(flags_dict_autonlp)
 flags = flags.update(flags_dict_display)
 print("flags :", flags)
@@ -186,22 +190,21 @@ if __name__ == '__main__':
 
     #autonlp.launch_to_model_deployment('tf+Logistic_Regression')
 
-    import pandas as pd
-    data_test = pd.read_csv(flags.path_data)
+    #import pandas as pd
+    #data_test = pd.read_csv(flags.path_data)
 
     #X_test = data_test[[flags.column_text]].copy()
-    X_test = data_test.copy()
-    if isinstance(flags.target, list):
-        Y_test = data_test[flags.target].copy()
-    else:
-        Y_test = data_test[[flags.target]].copy()
+    #X_test = data_test.copy()
+    #if isinstance(flags.target, list):
+    #    Y_test = data_test[flags.target].copy()
+    #else:
+    #    Y_test = data_test[[flags.target]].copy()
 
-    X_test, doc_spacy_data_test, y_test = autonlp.preprocess_test_data(X_test)
+    #X_test, doc_spacy_data_test, position_id_test, y_test = autonlp.preprocess_test_data(X_test)
 
     name_logs = 'best_logs'
-    on_test_data = False
-    autonlp.leader_predict(name_logs=name_logs, on_test_data=on_test_data, x=X_test, y=Y_test,
-                           doc_spacy_data_test=doc_spacy_data_test)
+    on_test_data = True
+    autonlp.leader_predict(name_logs=name_logs, on_test_data=on_test_data)
 
     leaderboard_test = autonlp.get_leaderboard(sort_by=flags.sort_leaderboard, dataset='test',
                                                info_models=autonlp.info_models)

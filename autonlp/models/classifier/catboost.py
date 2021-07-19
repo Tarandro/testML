@@ -13,9 +13,9 @@ class ML_CatBoost(Model):
     is_NN = False
 
     def __init__(self, flags_parameters, name_model_full, class_weight=None, len_unique_value={},
-                 time_series_features=None, scaler_info=None):
+                 time_series_features=None, scaler_info=None, position_id=None):
         Model.__init__(self, flags_parameters, name_model_full, class_weight, len_unique_value, time_series_features,
-                       scaler_info)
+                       scaler_info, position_id)
 
     def hyper_params(self, size_params='small'):
         parameters = dict()
