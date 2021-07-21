@@ -133,7 +133,10 @@ class Optimiz_hyperopt:
                 else:
                     y_true = self.y_val[:, i]
             # subset, only use data where fold_id >= 0 :
-            y_true_sample = y_true.values[np.where(fold_id >= 0)[0]]
+            if isinstance(y_true, pd.DataFrame):
+                y_true_sample = y_true.values[np.where(fold_id >= 0)[0]]
+            else:
+                y_true_sample = y_true[np.where(fold_id >= 0)[0]]
             prediction_oof_val = oof_val[:, i][np.where(fold_id >= 0)[0]]
             if 'regression' in self.Model_sklearn.objective:
                 if 'explained_variance' == self.scoring:
@@ -470,7 +473,10 @@ class Optimiz_hyperopt_NN:
                     y_true = self.y_val.iloc[:, i].copy()
                 else:
                     y_true = self.y_val[:, i]
-            y_true_sample = y_true.values[np.where(fold_id >= 0)[0]]
+            if isinstance(y_true, pd.DataFrame):
+                y_true_sample = y_true.values[np.where(fold_id >= 0)[0]]
+            else:
+                y_true_sample = y_true[np.where(fold_id >= 0)[0]]
             prediction_oof_val = oof_val[:, i][np.where(fold_id >= 0)[0]]
             if 'regression' in self.Model_NN.objective:
                 if 'explained_variance' == self.scoring:
