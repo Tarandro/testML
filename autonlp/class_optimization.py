@@ -61,16 +61,21 @@ class Optimiz_hyperopt:
             # cross-validation
             fold_id = np.ones((len(self.y),)) * -1
             oof_val = np.zeros((self.y.shape[0], self.y.shape[1]))
-            # Cross-validation split in self.nfolds but train only on self.nfolds_train chosen randomly
-            rd.seed(self.Model_sklearn.seed)
-            fold_to_train = rd.sample([i for i in range(self.nfolds)], k=max(min(self.nfolds_train, self.nfolds), 1))
+            if "time_series" not in self.Model_sklearn.objective:
+                # Cross-validation split in self.nfolds but train only on self.nfolds_train chosen randomly
+                rd.seed(self.Model_sklearn.seed)
+                fold_to_train = rd.sample([i for i in range(self.nfolds)], k=max(min(self.nfolds_train, self.nfolds), 1))
 
-            if self.cv_strategy == "StratifiedKFold":
-                skf = StratifiedKFold(n_splits=self.nfolds, random_state=self.Model_sklearn.seed, shuffle=True)
-                folds = skf.split(self.y, self.y)
+                if self.cv_strategy == "StratifiedKFold":
+                    skf = StratifiedKFold(n_splits=self.nfolds, random_state=self.Model_sklearn.seed, shuffle=True)
+                    folds = skf.split(self.y, self.y)
+                else:
+                    kf = KFold(n_splits=self.nfolds, random_state=self.Model_sklearn.seed, shuffle=True)
+                    folds = kf.split(self.y)
             else:
-                kf = KFold(n_splits=self.nfolds, random_state=self.Model_sklearn.seed, shuffle=True)
-                folds = kf.split(self.y)
+                folds = [
+                    ([i for i in range(self.Model_sklearn.size_train)], [i for i in range(self.Model_sklearn.size_train, fold_id.shape[0])])]
+                fold_to_train = [0]
         else:
             # validation
             fold_id = np.ones((len(self.y_val),)) * -1
@@ -342,16 +347,21 @@ class Optimiz_hyperopt_NN:
             # cross-validation
             fold_id = np.ones((len(self.y),)) * -1
             oof_val = np.zeros((self.y.shape[0], self.y.shape[1]))
-            # Cross-validation split in self.nfolds but train only on self.nfolds_train chosen randomly
-            rd.seed(self.Model_NN.seed)
-            fold_to_train = rd.sample([i for i in range(self.nfolds)], k=max(min(self.nfolds_train, self.nfolds), 1))
+            if "time_series" not in self.Model_NN.objective:
+                # Cross-validation split in self.nfolds but train only on self.nfolds_train chosen randomly
+                rd.seed(self.Model_NN.seed)
+                fold_to_train = rd.sample([i for i in range(self.nfolds)], k=max(min(self.nfolds_train, self.nfolds), 1))
 
-            if self.cv_strategy == "StratifiedKFold":
-                skf = StratifiedKFold(n_splits=self.nfolds, random_state=self.Model_NN.seed, shuffle=True)
-                folds = skf.split(self.y, self.y)
+                if self.cv_strategy == "StratifiedKFold":
+                    skf = StratifiedKFold(n_splits=self.nfolds, random_state=self.Model_NN.seed, shuffle=True)
+                    folds = skf.split(self.y, self.y)
+                else:
+                    kf = KFold(n_splits=self.nfolds, random_state=self.Model_NN.seed, shuffle=True)
+                    folds = kf.split(self.y)
             else:
-                kf = KFold(n_splits=self.nfolds, random_state=self.Model_NN.seed, shuffle=True)
-                folds = kf.split(self.y)
+                folds = [
+                    ([i for i in range(self.Model_NN.size_train)], [i for i in range(self.Model_NN.size_train, fold_id.shape[0])])]
+                fold_to_train = [0]
         else:
             # validation
             fold_id = np.ones((len(self.y_val),)) * -1

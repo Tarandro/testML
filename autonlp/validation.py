@@ -91,7 +91,7 @@ class Validation:
                     kf = KFold(n_splits=nfolds, shuffle=True, random_state=self.seed)
                     folds = kf.split(y)
             else:
-                folds = [('all', [i for i in range(self.size_train)])]
+                folds = [([i for i in range(self.size_train)], [i for i in range(self.size_train, self.fold_id.shape[0])])]
                 fold_to_train = [0]
         else:
             self.fold_id = np.ones((len(y_valid),)) * -1
