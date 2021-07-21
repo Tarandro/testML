@@ -98,14 +98,18 @@ class ML_LSTM(Model):
         value_series = list(y.columns)
         self.index_pivot_fit = []
         if self.position_id is None or self.position_date is None:
+            print(1)
             dt_date_id = dt[value_series]
             self.size_y_train_preprocessed = size_train - self.timesteps - 1
         elif self.position_date not in dt.columns:
+            print(2)
             dt_date_id = dt[value_series]
             self.size_y_train_preprocessed = size_train - self.timesteps - 1
         else:
             try:
+                print(3)
                 dt = pd.concat([self.position_id.loc[list(dt.index), :], dt], axis=1)
+                print(dt)
                 dt_date_id = dt.pivot(index=self.position_date, columns=self.position_id.columns[0],
                                       values=value_series[0])
                 for col in value_series[1:]:
@@ -122,6 +126,7 @@ class ML_LSTM(Model):
                     if i == size_train:
                         self.size_y_train_preprocessed = index_row - self.timesteps - 1
                         delate = index_column
+                print(4)
             except:
                 dt_date_id = dt[value_series]
                 self.size_y_train_preprocessed = size_train - self.timesteps - 1
@@ -159,7 +164,7 @@ class ML_LSTM(Model):
                 #    x_preprocessed["tok"] = []
             y_preprocessed = []
             self.shape_embedding = {}
-
+            print(6)
             for i in range(self.timesteps, x_array.shape[0] - 1):
                 x_preprocessed['inp'].append(x_array[i - self.timesteps:i])
                 y_preprocessed.append(self.scaler_ts.inverse_transform(x_array[i].reshape(1, -1)).reshape(-1))
@@ -180,6 +185,8 @@ class ML_LSTM(Model):
             for col in x_preprocessed.keys():
                 x_preprocessed[col] = np.array(x_preprocessed[col])
             y_preprocessed = np.array(y_preprocessed)
+            print(x_preprocessed)
+            print(y_preprocessed)
             logger.info("X_train shape :", x_preprocessed["inp"].shape)
             logger.info("y_train shape :", y_preprocessed.shape)
             for col in add_features_array.keys():
@@ -204,8 +211,8 @@ class ML_LSTM(Model):
             logger.info("Preprocess time_series, shapes :")
             x_preprocessed = np.array(x_preprocessed)
             y_preprocessed = np.array(y_preprocessed)
-            logger.info("X_train shape :", x_preprocessed.shape)
-            logger.info("y_train shape :", y_preprocessed.shape)
+            logger.info("X_train shape : {}".format(x_preprocessed.shape))
+            logger.info("y_train shape : {}".format(y_preprocessed.shape))
         del dt, x_array, dt_date_id
 
         if isinstance(x_preprocessed, dict):

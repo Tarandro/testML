@@ -22,7 +22,7 @@ flags_dict_info = {
 
 flags_dict_autonlp = {
     "objective": 'time_series_regression',    # 'binary' or 'multi-class' or 'regression'
-    "include_model": ['lightgbm'],  # 'logistic_regression', 'randomforest', 'lightgbm', 'xgboost', 'catboost', 'dense_network'
+    "include_model": ['lstm'],  # 'logistic_regression', 'randomforest', 'lightgbm', 'xgboost', 'catboost', 'dense_network'
     "max_run_time_per_model": 60,
     "frac_trainset": 0.7,
     "scoring": 'mse',

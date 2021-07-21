@@ -122,10 +122,16 @@ class Optimiz_hyperopt:
         for i in range(self.Model_sklearn.shape_y):
             if self.x_val is None:
                 # cross_validation
-                y_true = self.y.iloc[:, i].copy()
+                if isinstance(self.y, pd.DataFrame):
+                    y_true = self.y.iloc[:, i].copy()
+                else:
+                    y_true = self.y[:, i]
             else:
                 # validation
-                y_true = self.y_val.iloc[:, i].copy()
+                if isinstance(self.y, pd.DataFrame):
+                    y_true = self.y_val.iloc[:, i].copy()
+                else:
+                    y_true = self.y_val[:, i]
             # subset, only use data where fold_id >= 0 :
             y_true_sample = y_true.values[np.where(fold_id >= 0)[0]]
             prediction_oof_val = oof_val[:, i][np.where(fold_id >= 0)[0]]
@@ -401,7 +407,7 @@ class Optimiz_hyperopt_NN:
                 if isinstance(self.y, pd.DataFrame):
                     y_tr, y_val = self.y.values[tr], self.y.values[te]
                 else:
-                    y_tr, y_val = self.y[tr], self.y_val[te]
+                    y_tr, y_val = self.y[tr], self.y[te]
 
             model = self.Model_NN.model()
 
@@ -454,10 +460,16 @@ class Optimiz_hyperopt_NN:
         for i in range(self.Model_NN.shape_y):
             if self.x_val is None:
                 # cross_validation
-                y_true = self.y.iloc[:, i].copy()
+                if isinstance(self.y, pd.DataFrame):
+                    y_true = self.y.iloc[:, i].copy()
+                else:
+                    y_true = self.y[:, i]
             else:
                 # validation
-                y_true = self.y_val.iloc[:, i].copy()
+                if isinstance(self.y, pd.DataFrame):
+                    y_true = self.y_val.iloc[:, i].copy()
+                else:
+                    y_true = self.y_val[:, i]
             y_true_sample = y_true.values[np.where(fold_id >= 0)[0]]
             prediction_oof_val = oof_val[:, i][np.where(fold_id >= 0)[0]]
             if 'regression' in self.Model_NN.objective:
