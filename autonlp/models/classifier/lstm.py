@@ -98,18 +98,14 @@ class ML_LSTM(Model):
         value_series = list(y.columns)
         self.index_pivot_fit = []
         if self.position_id is None or self.position_date is None:
-            print(1)
             dt_date_id = dt[value_series]
             self.size_y_train_preprocessed = size_train - self.timesteps - 1
         elif self.position_date not in dt.columns:
-            print(2)
             dt_date_id = dt[value_series]
             self.size_y_train_preprocessed = size_train - self.timesteps - 1
         else:
             try:
-                print(3)
                 dt = pd.concat([self.position_id.loc[list(dt.index), :], dt], axis=1)
-                print(dt)
                 dt_date_id = dt.pivot(index=self.position_date, columns=self.position_id.columns[0],
                                       values=value_series[0])
                 for col in value_series[1:]:
@@ -126,7 +122,6 @@ class ML_LSTM(Model):
                     if i == size_train:
                         self.size_y_train_preprocessed = index_row - self.timesteps - 1
                         delate = index_column
-                print(4)
             except:
                 dt_date_id = dt[value_series]
                 self.size_y_train_preprocessed = size_train - self.timesteps - 1
@@ -164,7 +159,6 @@ class ML_LSTM(Model):
                 #    x_preprocessed["tok"] = []
             y_preprocessed = []
             self.shape_embedding = {}
-            print(6)
             for i in range(self.timesteps, x_array.shape[0] - 1):
                 x_preprocessed['inp'].append(x_array[i - self.timesteps:i])
                 y_preprocessed.append(self.scaler_ts.inverse_transform(x_array[i].reshape(1, -1)).reshape(-1))
@@ -179,16 +173,14 @@ class ML_LSTM(Model):
                 #    print('y :')
                 #    print(x_array[i])
 
-            self.input_last_timesteps = {"inp": [x_array[-self.timesteps:]]}
+            self.input_last_timesteps = {"inp": np.array([x_array[-self.timesteps:]])}
 
             logger.info("Preprocess time_series, shapes :")
             for col in x_preprocessed.keys():
                 x_preprocessed[col] = np.array(x_preprocessed[col])
             y_preprocessed = np.array(y_preprocessed)
-            print(x_preprocessed)
-            print(y_preprocessed)
-            logger.info("X_train shape :", x_preprocessed["inp"].shape)
-            logger.info("y_train shape :", y_preprocessed.shape)
+            logger.info("X_train shape : {}".format(x_preprocessed['inp'].shape))
+            logger.info("y_train shape : {}".format(y_preprocessed.shape))
             for col in add_features_array.keys():
                 #if col not in ['tok']:
                 self.shape_embedding[col] = (self.len_unique_value[col], 1)
@@ -206,12 +198,12 @@ class ML_LSTM(Model):
                 x_preprocessed.append(x_array[i - self.timesteps:i])
                 y_preprocessed.append(x_array[i])
                 if (i + 1) == x_array.shape[0]:
-                    self.input_last_timesteps = np.array([x_array[i - self.timesteps:i]])
+                    self.input_last_timesteps = {"inp": np.array([x_array[i - self.timesteps:i]])}
 
             logger.info("Preprocess time_series, shapes :")
-            x_preprocessed = np.array(x_preprocessed)
+            x_preprocessed = {"inp": np.array(x_preprocessed)}
             y_preprocessed = np.array(y_preprocessed)
-            logger.info("X_train shape : {}".format(x_preprocessed.shape))
+            logger.info("X_train shape : {}".format(x_preprocessed["inp"].shape))
             logger.info("y_train shape : {}".format(y_preprocessed.shape))
         del dt, x_array, dt_date_id
 
@@ -224,7 +216,7 @@ class ML_LSTM(Model):
 
         return x_preprocessed, y_preprocessed
 
-    def preprocessing_transform(self, x, y=None):
+    def preprocessing_transform(self, x, y=None, position_id_test=None):
 
         if y is not None:
             if x is not None:
@@ -233,18 +225,18 @@ class ML_LSTM(Model):
                 dt = y.copy()
 
             value_series = list(y.columns)
-            if self.position_id is None or self.position_date is None:
+            if position_id_test is None or self.position_date is None:
                 dt_date_id = dt[value_series]
             elif self.position_date not in dt.columns:
                 dt_date_id = dt[value_series]
             else:
                 try:
-                    dt = pd.concat([self.position_id.loc[list(dt.index), :], dt], axis=1)
-                    dt_date_id = dt.pivot(index=self.position_date, columns=self.position_id.columns[0],
+                    dt = pd.concat([position_id_test.loc[list(dt.index), :], dt], axis=1)
+                    dt_date_id = dt.pivot(index=self.position_date, columns=position_id_test.columns[0],
                                           values=value_series[0])
                     for col in value_series[1:]:
                         dt_date_id = pd.concat([dt_date_id,
-                                                dt.pivot(index=self.position_date, columns=self.position_id.columns[0],
+                                                dt.pivot(index=self.position_date, columns=position_id_test.columns[0],
                                                          values=col)], axis=1)
                 except:
                     dt_date_id = dt[value_series]
@@ -265,12 +257,12 @@ class ML_LSTM(Model):
         add_features_to_date = pd.concat([self.add_features_to_date_input_last_timesteps, add_features_to_date], axis=0)
 
         self.index_pivot_pred = []
-        if self.position_id is not None:
+        if position_id_test is not None:
             list_column = list(self.features_id)
-            dt = pd.concat([self.position_id.loc[list(x.index), :], x], axis=1)
+            dt = pd.concat([position_id_test.loc[list(x.index), :], x], axis=1)
             for i, row in dt.iterrows():
                 index_row = list_index.index(row[self.position_date])
-                index_column = list_column.index(row[self.position_id.columns[0]])
+                index_column = list_column.index(row[position_id_test.columns[0]])
                 self.index_pivot_pred.append(index_row * len(list_column) + index_column)
 
         add_features_array = {}
@@ -349,8 +341,13 @@ class ML_LSTM(Model):
         params_all['nb_classes'] = self.nb_classes
         params_all['shape_embedding'] = self.shape_embedding
 
+        params_all['features_id'] = self.features_id
+
         df_to_dict = self.add_features_to_date_input_last_timesteps.to_dict()
         params_all['add_features_to_date_input_last_timesteps'] = df_to_dict
+
+        input_last_timesteps = {k: v.tolist() for k, v in self.input_last_timesteps.items()}
+        params_all['input_last_timesteps'] = input_last_timesteps
 
         self.params_all = {self.name_model_full: params_all}
 
@@ -365,7 +362,10 @@ class ML_LSTM(Model):
         self.nb_classes = params_all['nb_classes']
         self.shape_embedding = params_all['shape_embedding']
 
+        self.features_id = params_all['features_id']
+
         self.add_features_to_date_input_last_timesteps = pd.DataFrame(params_all['add_features_to_date_input_last_timesteps'])
+        self.input_last_timesteps = {k: np.array(v) for k, v in params_all['input_last_timesteps'].items()}
 
     def model(self, hyper_params_clf={}):
         dense = tf.keras.layers.Input(shape=(self.shape_x_1, self.shape_x_2,), name="inp")

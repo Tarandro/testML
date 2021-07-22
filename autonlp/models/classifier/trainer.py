@@ -311,7 +311,7 @@ class Model:
             time_series_recursive = True
             if 'time_series' in self.objective:
                 if self.name_classifier == 'LSTM':
-                    x_test, y_test = self.preprocessing_transform(x_test, y_test)
+                    x_test, y_test = self.preprocessing_transform(x_test, y_test, position_id_test)
                 elif self.is_NN:
                     x_test = self.preprocessing_transform(x_test)
                     if time_series_recursive:

@@ -128,8 +128,9 @@ class Prediction:
                                 x_preprocessed[col] = np.array([x[col][0]])
 
                             for j in range(timesteps, timesteps + prediction_steps):
-                                if x_preprocessed['tok'].shape[0] != prediction_steps:
-                                    predicted_stock_price = model.predict(x_preprocessed)
+
+                                #if x_preprocessed['tok'].shape[0] != prediction_steps:
+                                predicted_stock_price = model.predict(x_preprocessed)
 
                                 if self.time_series_recursive or y is None:
                                     inp = np.append(x_preprocessed['inp'], predicted_stock_price).reshape(1,
