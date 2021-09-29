@@ -43,7 +43,7 @@ from .models.classifier_nlp.xgboost_tree import XGBoost
 from .models.classifier_nlp.blend_models import BlendModel
 
 from .models.classifier.logistic_regression import ML_Logistic_Regression
-from .models.classifier.randomforest_classifier import ML_RandomForest
+from .models.classifier.randomforest import ML_RandomForest
 from .models.classifier.lightgbm import ML_LightGBM
 from .models.classifier.xgboost import ML_XGBoost
 from .models.classifier.catboost import ML_CatBoost
@@ -264,6 +264,7 @@ class AutoNLP:
             logger.info("Test set size : {}".format(len(self.X_test)))
         else:
             logger.info("Test set size : 0")
+        self.position_id_test = None
 
     def split_data_ts(self, startDate_train, endDate_train):
 

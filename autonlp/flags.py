@@ -37,6 +37,7 @@ class Flags:
     target: str = 'target'
 
     ### Preprocessing ML
+    columns_to_remove: list = field(default_factory=list)
     ordinal_features: list = field(default_factory=list)
     normalize: bool = True
     method_scaling: str = 'MinMaxScaler'   # 'MinMaxScaler', 'RobustScaler', 'StandardScaler'

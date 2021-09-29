@@ -6,9 +6,11 @@ from autonlp.flags import Flags
 # Parameters
 #####################
 
+# todo : arg remove column
+
 flags_dict_info = {
     "debug": False,  # for debug : use only 50 data rows for training
-    "path_data": "C:/Users/agassmann/Documents/data/data_time_series.csv",
+    "path_data": "C:/Users/agassmann/Documents/data/dev.csv",
     "path_data_validation": "",
     "apply_logs": True,
     "outdir": "./logs",
@@ -17,17 +19,17 @@ flags_dict_info = {
     "seed": 15,
     "apply_app": False,
 
-    "target": ["sold"]
+    "target": ["target"]
 }
 
 flags_dict_autonlp = {
-    "objective": 'time_series_regression',    # 'binary' or 'multi-class' or 'regression'
-    "include_model": ['lstm'],  # 'logistic_regression', 'randomforest', 'lightgbm', 'xgboost', 'catboost', 'dense_network'
+    "objective": 'regression',    # 'binary' or 'multi-class' or 'regression'
+    "include_model": ['randomforest', 'lightgbm', 'xgboost'],  # 'logistic_regression', 'randomforest', 'lightgbm', 'xgboost', 'catboost', 'dense_network'
     "max_run_time_per_model": 60,
-    "frac_trainset": 0.7,
+    "frac_trainset": 0.8,
     "scoring": 'mse',
     "nfolds": 5,
-    "nfolds_train": 1,
+    "nfolds_train": 5,
     "class_weight": False,
     "apply_blend_model": True,
     "verbose": 2,
@@ -45,8 +47,9 @@ flags_dict_autonlp = {
 
 flags_dict_ml_preprocessing = {
 
-    "ordinal_features": ["item_id", "dept_id", "store_id", "cat_id", "state_id", "wday", "month",
-                         "year", 'event_name_1', 'event_type_1', 'event_name_2', 'event_type_2'],
+    #"ordinal_features": ["item_id", "dept_id", "store_id", "cat_id", "state_id", "wday", "month",
+    #                     "year", 'event_name_1', 'event_type_1', 'event_name_2', 'event_type_2'],
+    "columns_to_remove": ["cut_target", "excerpt", "id"],
     "normalize": True,
     "method_scaling": 'MinMaxScaler',   # 'MinMaxScaler', 'RobustScaler', 'StandardScaler'
     "type_columns": None,
@@ -83,8 +86,8 @@ flags_dict_ts_preprocessing = {
     "LSTM_date_features": ['wday', 'month', 'year', 'event_name_1', 'event_type_1', 'event_name_2',
                            'event_type_2', 'snap_CA', 'snap_TX', 'snap_WI'],
     "timesteps": 14,
-    "step_lags": [1,3,7],
-    "step_rolling": [7],
+    "step_lags": [], #[1,3,7],
+    "step_rolling": [], #[7],
     "win_type": None
 }
 
@@ -163,10 +166,12 @@ if __name__ == '__main__':
         df_all_results.to_csv('./results/df_all_results_mean.csv', index=False)
     # autonlp.show_distribution_scores()
 
-    # df_oof_val = autonlp.Y_train.copy()
-    # for name in autonlp.models.keys():
-    #     df_oof_val[name] = np.argmax(autonlp.models[name].info_scores['oof_val'], axis=1).reshape(-1)
-    # df_oof_val.to_csv('./results/df_oof_val.csv', index=False)
+    import numpy as np
+    df_oof_val = autonlp.Y_train.copy()
+    for name in autonlp.models.keys():
+        df_oof_val[name] = autonlp.models[name].info_scores['oof_val'].reshape(-1)
+    df_oof_val.to_csv('./results/df_oof_val.csv', index=False)
+    print(df_oof_val)
 
     if 'binary' in autonlp.objective:
         autonlp.get_roc_curves()

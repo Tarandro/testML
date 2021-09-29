@@ -123,7 +123,7 @@ class Optimiz_hyperopt:
             if self.x_val is None:
                 # cross_validation
                 if isinstance(self.y, pd.DataFrame):
-                    y_true = self.y.iloc[:, i].copy()
+                    y_true = self.y.iloc[:, [i]].copy()
                 else:
                     y_true = self.y[:, i]
             else:
@@ -464,7 +464,7 @@ class Optimiz_hyperopt_NN:
             if self.x_val is None:
                 # cross_validation
                 if isinstance(self.y, pd.DataFrame):
-                    y_true = self.y.iloc[:, i].copy()
+                    y_true = self.y.iloc[:, [i]].copy()
                 else:
                     y_true = self.y[:, i]
             else:

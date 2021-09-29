@@ -61,6 +61,7 @@ class Preprocessing:
         self.feature_selection = flags_parameters.feature_selection
         self.bin_numeric_features = flags_parameters.bin_numeric_features
         self.remove_low_variance = flags_parameters.remove_low_variance
+        self.columns_to_remove = flags_parameters.columns_to_remove
         self.info_pca = flags_parameters.info_pca
         self.info_tsne = flags_parameters.info_tsne
         self.info_stats = flags_parameters.info_stats
@@ -131,9 +132,9 @@ class Preprocessing:
                 'date': list(data.loc[:,
                              data.dtypes.astype(str).isin(['datetime64', 'datetime64[ns]', 'datetime'])].columns)
             }
-            self.type_columns = {k: [col for col in v if col not in self.target] for k, v in self.type_columns.items()}
+            self.type_columns = {k: [col for col in v if col not in self.target+self.columns_to_remove] for k, v in self.type_columns.items()}
 
-        self.base_features = [col for col in list(data.columns) if col not in self.target]  # useful for pca / tsne in case of categorical features
+        self.base_features = [col for col in list(data.columns) if col not in self.target+self.columns_to_remove]  # useful for pca / tsne in case of categorical features
 
         self.outdir_pre = os.path.join(flags_parameters.outdir, "preprocessing")
         os.makedirs(self.outdir_pre, exist_ok=True)
@@ -154,6 +155,8 @@ class Preprocessing:
                     logger.error("unknown spacy model name")
 
     def preprocessing_mandatory(self, data):
+
+        data = data.drop([col for col in self.columns_to_remove if col in data.columns], axis=1)
 
         ###### Ordinal Encoding
         self.enc = OrdinalEncoder(dtype="int")
@@ -216,6 +219,8 @@ class Preprocessing:
         return data
 
     def preprocessing_mandatory_transform(self, data_test):
+
+        data_test = data_test.drop([col for col in self.columns_to_remove if col in data_test.columns], axis=1)
 
         ###### Ordinal Encoding
         for col in self.ordinal_features:
